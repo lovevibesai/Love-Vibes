@@ -1,0 +1,576 @@
+# Love Vibes: Master UI/UX Blueprint
+**Version:** 1.0.0  
+**Date:** 2026-01-18  
+**Status:** Design System Specification
+
+---
+
+## 1. Design Philosophy
+
+**Timeless. Elegant. Human.**
+
+Love Vibes prioritizes emotional resonance over trends. The interface feels like a premium journal—intimate, sophisticated, and calming. Every interaction should feel intentional, never rushed.
+
+**Core Principles:**
+- **Clarity Over Complexity:** Clean typography, generous whitespace, focused interactions
+- **Emotion First:** Warm, inviting atmosphere that reduces dating anxiety
+- **Trust Through Transparency:** Honest visual hierarchy, clear CTAs, no dark patterns
+- **Accessible Romance:** WCAG 2.1 AA compliant, inclusive design for all abilities
+
+---
+
+## 2. Visual Identity
+
+### 2.1 Color Palette
+
+**Primary: Deep Burgundy**
+- `#8B3A3A` — Primary actions, active states, love mode indicator
+- `#A64D4D` — Hover states
+- `#6B2D2D` — Pressed states
+
+**Secondary: Warm Terracotta**
+- `#C17767` — Friendship mode indicator, secondary actions
+- `#D4907F` — Light accents
+
+**Neutrals: Sophisticated Warm Grays**
+- `#F8F6F4` — Background (soft ivory)
+- `#E8E4E0` — Cards, elevated surfaces
+- `#B8B0A8` — Borders, dividers
+- `#6B6560` — Body text
+- `#2D2926` — Headings, high-emphasis text
+
+**Accents:**
+- `#D4AF37` — Gold (verified badges, premium features)
+- `#4A7C59` — Sage green (trust score high)
+- `#E85D4A` — Coral red (warnings, destructive actions)
+
+**Gradients:**
+- Love Mode: `linear-gradient(135deg, #8B3A3A 0%, #C17767 100%)`
+- Friendship Mode: `linear-gradient(135deg, #C17767 0%, #D4AF37 100%)`
+
+### 2.2 Typography
+
+**Primary Font: Inter** (System fallback: SF Pro, Segoe UI)
+- Headings: 600 weight, -0.02em tracking
+- Body: 400 weight, -0.01em tracking, 1.6 line-height
+- Captions: 500 weight, 0.01em tracking
+
+**Display Font: Crimson Pro** (Serif, for emotional moments)
+- Match announcements, welcome screens
+- 400-600 weight range
+
+**Scale:**
+- H1: 32px / 2rem
+- H2: 24px / 1.5rem
+- H3: 20px / 1.25rem
+- Body: 16px / 1rem
+- Caption: 14px / 0.875rem
+- Small: 12px / 0.75rem
+
+### 2.3 Spacing System
+
+**8px Base Grid**
+- xs: 4px
+- sm: 8px
+- md: 16px
+- lg: 24px
+- xl: 32px
+- 2xl: 48px
+- 3xl: 64px
+
+### 2.4 Elevation & Shadows
+
+```
+Level 1 (Cards): 0 2px 8px rgba(45, 41, 38, 0.08)
+Level 2 (Modals): 0 8px 24px rgba(45, 41, 38, 0.12)
+Level 3 (Dropdowns): 0 16px 48px rgba(45, 41, 38, 0.16)
+```
+
+### 2.5 Border Radius
+
+- Buttons: 12px
+- Cards: 16px
+- Modals: 24px
+- Avatar: 50% (circular)
+- Images: 8px
+
+---
+
+## 3. Core User Flows
+
+### 3.1 Onboarding Journey
+
+**Screen 1: Welcome**
+- Full-screen gradient background (Love Mode gradient)
+- Centered logo (minimal wordmark)
+- Headline: "Find Your Vibe" (Crimson Pro, 40px)
+- Subheadline: "Meaningful connections, your way"
+- CTA: "Continue with Phone Number"
+
+**Screen 2: Phone Verification**
+- Top: Progress indicator (1/5)
+- Phone input with country code selector
+- Inline validation (green checkmark on valid)
+- Legal: Small text linking to Terms & Privacy
+
+**Screen 3: Mode Selection**
+- Split-screen design
+- Left half: "Looking for Love" (Burgundy gradient)
+  - Icon: Heart outline
+  - Description: "Romantic connections"
+- Right half: "Seeking Friendship" (Terracotta gradient)
+  - Icon: Handshake outline
+  - Description: "Platonic bonds"
+- Toggle between modes (can change later in settings)
+
+**Screen 4: Profile Setup**
+- Circular photo upload area (center, 120px diameter)
+  - Dashed border animation on hover
+  - "Add your best photo" placeholder
+- Fields below:
+  - Name (required)
+  - Age (required, dropdown 18-99)
+  - Bio (optional, 250 char limit with counter)
+- Skip option (top-right, subtle)
+
+**Screen 5: Video Intro**
+- Camera preview (16:9 aspect ratio)
+- Recording button (center, pulsing red dot)
+- Timer: 15 seconds countdown
+- "Show your personality" prompt
+- Skip available (saves as null in DB)
+
+**Screen 6: Location Permission**
+- Illustration: Abstract map with gentle pulse
+- Headline: "Find vibes nearby"
+- Body: "We use your location to show people around you"
+- CTA: "Enable Location"
+- Secondary: "Enter manually" (opens city search)
+
+### 3.2 Main Feed (Discovery)
+
+**Layout: Card Stack**
+- Single card in focus (occupies 80% viewport height)
+- Card design:
+  - Photo (top 60%, cover fit)
+  - Gradient overlay (bottom, fades to solid color)
+  - Profile info (absolute positioned over gradient):
+    - Name, Age (24px bold)
+    - Distance (12px, icon + text)
+    - Mode badge (top-right corner: heart or handshake icon)
+    - Trust score (subtle progress ring, 32px, top-left)
+- Video intro button (floating, bottom-right of photo)
+  - Plays inline on tap, fullscreen on second tap
+
+**Actions:**
+- Swipe left: Pass (card slides left, fades out)
+- Swipe right: Like (card slides right, heart animation bursts)
+- Tap card: Expand to full profile
+- Bottom action bar (always visible):
+  - Pass button (left, circular, X icon, `#E85D4A`)
+  - Video play (center, circular, play icon)
+  - Like button (right, circular, heart icon, `#8B3A3A`)
+
+**Empty State:**
+- Illustration: Person sitting with thought bubble
+- Headline: "You're all caught up"
+- Body: "Check back soon for new vibes"
+- CTA: "Adjust filters" (opens settings)
+
+### 3.3 Match Announcement
+
+**Trigger:** Mutual like detected
+
+**Animation Sequence:**
+1. Screen dims (overlay: `rgba(139, 58, 58, 0.9)`)
+2. Confetti burst from center
+3. Two profile photos slide in from left/right, merge at center
+4. Headline fades in: "It's a Match!" (Crimson Pro, 36px, gold color)
+5. Subtext: "You both liked each other"
+6. CTAs:
+   - "Send a Message" (primary button, full-width)
+   - "Keep Swiping" (text link, subtle)
+
+**Haptic Feedback:** Double pulse (iOS), gentle vibration (Android)
+
+### 3.4 Chat Interface
+
+**Header:**
+- Back button (left)
+- Match name + online status indicator (green dot if active)
+- Trust score badge (right, tappable for details)
+- Three-dot menu (report, unmatch, mute)
+
+**Message List:**
+- Grouped by date (sticky headers: "Today", "Yesterday", "Jan 15")
+- Sent messages: Right-aligned, burgundy bubble, white text
+- Received: Left-aligned, light gray bubble, dark text
+- Timestamps (below bubble, 11px, gray)
+- Read receipts (double checkmark)
+
+**Input Area:**
+- Text field (multi-line, auto-expand to 4 lines max)
+- Attachment button (left: photo, gift icons)
+- Send button (right: paper plane icon, disabled when empty)
+
+**Gift Sending:**
+- Tap gift icon → opens bottom sheet
+- Grid of gift items (3 columns):
+  - Each card: Icon, name, cost in credits
+  - Tap to select, "Send Gift" button appears
+- Confirmation modal before deduction
+
+### 3.5 Profile (Self)
+
+**Header:**
+- Cover gradient (mode-dependent)
+- Profile photo (120px, centered, overlaps gradient edge)
+- Edit button (top-right, pencil icon)
+
+**Sections:**
+- **Stats Row** (horizontal cards):
+  - Matches count
+  - Credits balance (gold icon)
+  - Trust score (progress circle)
+- **Mode Toggle:**
+  - Visual switch between Love/Friendship
+  - Applies immediately (updates S2 feed filter)
+- **Video Intro:**
+  - Thumbnail with play overlay
+  - "Record new" option
+- **About:**
+  - Bio text (editable inline)
+  - Verified badge (if `is_verified = true`)
+- **Settings:**
+  - Location (city name, tap to update)
+  - Visibility (show me to: everyone/friends/invisible)
+  - Notifications
+  - Privacy & Safety
+  - Account (logout, delete)
+
+---
+
+## 4. Component Library
+
+### 4.1 Buttons
+
+**Primary:**
+```
+Background: #8B3A3A
+Text: #FFFFFF (16px, 600 weight)
+Padding: 12px 24px
+Border-radius: 12px
+Hover: #A64D4D
+Active: #6B2D2D
+```
+
+**Secondary:**
+```
+Background: transparent
+Border: 2px solid #8B3A3A
+Text: #8B3A3A
+(Same dimensions as primary)
+```
+
+**Ghost:**
+```
+Background: transparent
+Text: #6B6560
+No border
+Hover: Background #E8E4E0
+```
+
+### 4.2 Input Fields
+
+```
+Background: #FFFFFF
+Border: 1px solid #B8B0A8
+Border-radius: 8px
+Padding: 12px 16px
+Font: 16px, #2D2926
+
+Focus state:
+  Border: 2px solid #8B3A3A
+  Shadow: 0 0 0 3px rgba(139, 58, 58, 0.1)
+
+Error state:
+  Border: 2px solid #E85D4A
+  Helper text: #E85D4A, 14px
+```
+
+### 4.3 Cards
+
+```
+Background: #FFFFFF
+Border-radius: 16px
+Padding: 24px
+Shadow: Level 1
+Border: 1px solid #E8E4E0
+```
+
+### 4.4 Badges
+
+**Mode Badge:**
+```
+Dating: Background #8B3A3A, Heart icon
+Friendship: Background #C17767, Handshake icon
+Size: 32px × 32px, circular
+Icon: 16px, white
+Position: Absolute, top-right of card
+```
+
+**Trust Score:**
+```
+Circular progress ring
+Size: 40px diameter
+Stroke: 4px
+Color: 
+  0-50: #E85D4A
+  51-75: #D4AF37
+  76-100: #4A7C59
+Center: Score number (14px, 600 weight)
+```
+
+**Verified Badge:**
+```
+Gold checkmark icon (#D4AF37)
+12px × 12px
+Positioned next to name
+Tooltip on hover: "Verified profile"
+```
+
+### 4.5 Modals
+
+```
+Background: #FFFFFF
+Border-radius: 24px (top corners)
+Max-width: 480px (desktop)
+Full-width (mobile, slides from bottom)
+Padding: 32px
+Backdrop: rgba(45, 41, 38, 0.6), blur(8px)
+
+Header: 
+  Title (H2)
+  Close button (top-right, X icon)
+  
+Body:
+  Content area (scrollable if needed)
+  
+Footer:
+  Actions (right-aligned, primary + secondary)
+```
+
+---
+
+## 5. Responsive Breakpoints
+
+```
+Mobile: 320px - 767px (single column, bottom nav)
+Tablet: 768px - 1023px (single column, side nav)
+Desktop: 1024px+ (max-width 1200px content, centered)
+```
+
+**Navigation:**
+- **Mobile:** Bottom tab bar (Home, Matches, Profile)
+- **Desktop:** Left sidebar (fixed, 240px wide)
+
+---
+
+## 6. Animations & Transitions
+
+**Micro-interactions:**
+- Button press: Scale 0.98, 100ms
+- Card swipe: Spring animation, damping 0.7
+- Modal enter: Slide-up + fade, 300ms ease-out
+- Loading states: Skeleton screens (shimmer effect)
+
+**Page Transitions:**
+- Forward: Slide-left + fade (250ms)
+- Back: Slide-right + fade (250ms)
+
+**Special Moments:**
+- Match: Confetti particle system (3s duration, 200 particles)
+- Gift sent: Heart burst from sender bubble (1.5s)
+- Trust score increase: Progress ring fills with celebration flash
+
+---
+
+## 7. Iconography
+
+**Style:** Lucide Icons (outline style, 2px stroke)
+
+**Key Icons:**
+- Heart (love mode)
+- Users (friendship mode)
+- MapPin (location)
+- MessageCircle (chat)
+- Gift (gifting)
+- Shield (trust score)
+- CheckCircle (verified)
+- X (pass)
+- Star (favorites)
+- Settings (gear)
+
+**Size Scale:**
+- sm: 16px
+- md: 24px
+- lg: 32px
+- xl: 48px
+
+---
+
+## 8. Accessibility
+
+**Focus States:**
+- Visible outline: 3px solid #8B3A3A
+- Offset: 2px
+
+**Touch Targets:**
+- Minimum: 44px × 44px (WCAG 2.5.5)
+
+**Color Contrast:**
+- Text on background: 7:1 (AAA)
+- UI elements: 4.5:1 (AA)
+
+**Screen Reader:**
+- Semantic HTML (nav, main, article, aside)
+- ARIA labels on icon-only buttons
+- Live regions for match announcements
+
+**Keyboard Navigation:**
+- Tab order follows visual hierarchy
+- Escape closes modals
+- Arrow keys navigate card stack (optional enhancement)
+
+---
+
+## 9. Motion Preferences
+
+**Respect `prefers-reduced-motion`:**
+```css
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+```
+
+---
+
+## 10. Loading & Error States
+
+**Initial Load:**
+- Splash screen (2s max): Logo on gradient, subtle pulse
+- Then: Skeleton screens for feed
+
+**Infinite Scroll:**
+- Bottom spinner (16px, burgundy)
+- "Loading more vibes..." text
+
+**Empty States:**
+- Custom illustrations (warm, hand-drawn style)
+- Actionable CTAs (never dead ends)
+
+**Error Messages:**
+- Toast notifications (top-center, 4s auto-dismiss)
+- Inline errors (below input fields)
+- Network error: "Connection lost" banner (persistent until resolved)
+
+---
+
+## 11. Dark Mode (Future Consideration)
+
+**Not implemented in V1, but color variables prepared:**
+```
+Background: #1A1816
+Surface: #2D2926
+Text: #F8F6F4
+Primary: #C17767 (lighter burgundy for contrast)
+```
+
+---
+
+## 12. File Naming & Organization
+
+```
+/assets
+  /icons (SVG, 24×24px)
+  /illustrations (SVG, various)
+  /fonts (Woff2 format)
+  
+/styles
+  tokens.css (colors, spacing, typography)
+  components.css (reusable classes)
+  layouts.css (grid, flex utilities)
+  
+/screens
+  onboarding/
+  feed/
+  chat/
+  profile/
+```
+
+---
+
+## 13. Performance Budget
+
+- First Contentful Paint: < 1.5s
+- Largest Contentful Paint: < 2.5s
+- Total Blocking Time: < 200ms
+- Cumulative Layout Shift: < 0.1
+- Image optimization: WebP format, lazy loading below fold
+
+---
+
+## 14. Implementation Notes
+
+**Framework Agnostic:**
+This blueprint can be implemented in React, Vue, Svelte, or vanilla JS. Component structure should follow:
+
+```
+<LoveVibesCard>
+  <ProfileImage />
+  <GradientOverlay />
+  <ProfileInfo>
+    <ModeBadge />
+    <TrustScore />
+  </ProfileInfo>
+  <ActionBar />
+</LoveVibesCard>
+```
+
+**State Management:**
+- Auth state: JWT in httpOnly cookie
+- User profile: Global store (Context/Vuex/Svelte store)
+- Feed cards: Local component state (infinite scroll)
+- WebSocket: Singleton connection manager
+
+**Asset Pipeline:**
+- Photos: R2 URL with transform params (`?width=800&quality=80`)
+- Videos: HLS streaming for 15s intros
+- Icons: Inline SVG (tree-shaken, < 2KB total)
+
+---
+
+## 15. Brand Voice (Microcopy)
+
+**Tone:** Warm, encouraging, never desperate
+
+**Examples:**
+- Empty matches: "Your vibe attracts your tribe. Keep swiping!"
+- Profile incomplete: "Show your personality—add a video intro"
+- Location disabled: "We can't find vibes near you without location access"
+- Error: "Oops, something went wrong. Try again?"
+- Success: "Gift sent! They'll love it."
+
+**Avoid:**
+- Corporate speak ("Optimize your experience")
+- Urgency tactics ("Don't miss out!")
+- Shame ("You haven't matched with anyone yet")
+
+---
+
+**END OF BLUEPRINT**
+
+*This design system is a living document. As Love Vibes evolves, this blueprint should be updated to reflect new patterns, components, and user insights.*

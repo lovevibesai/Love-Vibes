@@ -1,0 +1,167 @@
+syntax = "proto3";
+
+package lovevibes;
+
+// The Mode of the user: key for the "Friendship vs Dating" feature.
+enum UserMode {
+  MODE_DATING = 0;
+  MODE_FRIENDSHIP = 1;
+  MODE_BOTH = 2;
+}
+
+// User Profile Structure
+// Maps to 'Users' table in D1.
+message UserProfile {
+  string id = 1;
+  string name = 2;
+  string bio = 3;
+  int32 age = 4;
+  string main_photo_url = 5;
+  repeated string photo_urls = 6;
+  string video_intro_url = 7;
+
+  // Location Data
+  double lat = 8;
+  double long = 9;
+  string city = 10;
+  string hometown = 15;
+
+  // Love Vibes Specifics
+  UserMode mode = 11;
+  int32 trust_score = 12;
+  bool is_verified = 13;
+  int32 credits_balance = 14;
+  
+  // New Profile Fields
+  int32 height_cm = 16;
+  repeated string relationship_goals = 17;
+  string drinking = 18;
+  string smoking = 19;
+  string exercise_frequency = 20;
+  string diet = 21;
+  string pets = 22;
+  repeated string interests = 23;
+  repeated string languages = 24;
+  
+  // Extended Fields
+  repeated string ethnicity = 25;
+  string religion = 26;
+  string has_children = 27;
+  string wants_children = 28;
+  string star_sign = 29;
+  bool is_id_verified = 30;
+  int64 last_active = 31;
+  repeated UserPromptResponse prompt_responses = 32;
+}
+
+// Profile Prompts
+message ProfilePrompt {
+  string id = 1;
+  string prompt_text = 2;
+  string category = 3;
+}
+
+message UserPromptResponse {
+  string prompt_id = 1;
+  string prompt_text = 2;
+  string response_text = 3;
+  int32 display_order = 4;
+}
+
+// The Feed Request (Discovery Preferences)
+message GetFeedRequest {
+  string user_id = 1;
+  double lat = 2;
+  double long = 3;
+  int32 radius_km = 4;
+  UserMode filter_mode = 5;
+  
+  // Advanced Filters
+  int32 age_min = 6;
+  int32 age_max = 7;
+  int32 height_min = 8;
+  int32 height_max = 9;
+  repeated string relationship_goals = 10;
+  repeated string drinking = 11;
+  repeated string smoking = 12;
+  bool show_verified_only = 13;
+  bool show_with_video_only = 14;
+  int32 min_trust_score = 15;
+}
+
+// Swipe Action
+message SwipeRequest {
+  string actor_id = 1;
+  string target_id = 2;
+  enum Action {
+    PASS = 0;
+    LIKE = 1;
+    SUPERLIKE = 2;
+  }
+  Action action = 3;
+}
+
+// Match Event (Returned when a swipe results in a match)
+message MatchEvent {
+  string match_id = 1;
+  UserProfile matched_user = 2;
+  int64 timestamp = 3;
+  string chat_room_id = 4; // Durable Object ID
+}
+
+// Chat Message
+message ChatMessage {
+  string id = 1;
+  string sender_id = 2;
+  string text = 3;
+  string match_id = 4;
+  int64 timestamp = 5;
+  
+  enum Type {
+    TEXT = 0;
+    IMAGE = 1;
+    GIFT = 2; // "Sent a Virtual Rose"
+  }
+  Type type = 6;
+  string payload = 7; // URL or Gift ID
+}
+
+// Gifting (Virtual/Physical)
+message GiftItem {
+  string id = 1;
+  string name = 2;
+  int32 cost_credits = 3;
+  string image_url = 4;
+  bool is_physical = 5;
+}
+
+message SendGiftRequest {
+  string recipient_id = 1;
+  string item_id = 2;
+  string message = 3;
+}
+
+// Safety
+message ReportUserRequest {
+  string reported_id = 1;
+  string reason = 2; // "SPAM", "HARASSMENT", "FAKE", "OTHER"
+  string details = 3;
+}
+
+message BlockUserRequest {
+  string blocked_id = 1;
+}
+
+// Verification Flow
+message VerificationRequest {
+  string user_id = 1;
+  string selfie_image_url = 2;
+  string id_image_url = 3; // Optional
+  string pose_id = 4;
+}
+
+message VerificationResponse {
+  bool success = 1;
+  string message = 2;
+  bool is_verified = 3;
+}

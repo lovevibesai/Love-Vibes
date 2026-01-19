@@ -1,0 +1,42 @@
+name = "love-vibes-backend"
+main = "src/index.ts"
+compatibility_date = "2025-01-18"
+
+# D1 Database Binding (User Profiles, Swipes, Matches)
+[[d1_databases]]
+binding = "DB"
+database_name = "LoveVibesDB"
+database_id = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" # Placeholder
+
+# KV Namespace Binding (Geosharding Map)
+[[kv_namespaces]]
+binding = "GEO_KV"
+id = "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" # Placeholder
+
+# R2 Bucket Binding (Photos/Videos)
+[[r2_buckets]]
+binding = "MEDIA_BUCKET"
+bucket_name = "love-vibes-media"
+
+# Durable Objects (Real-time Chat & Lobbies)
+[[durable_objects.bindings]]
+name = "CHAT_ROOM"
+class_name = "ChatRoom"
+
+[[durable_objects.bindings]]
+name = "MATCH_LOBBY"
+class_name = "MatchLobby"
+
+# Migrations for Durable Objects
+[[migrations]]
+tag = "v1"
+new_classes = ["ChatRoom", "MatchLobby"]
+
+# Queue for Async Jobs (Optional: e.g. Image Processing)
+[[queues.producers]]
+  queue = "media-processing-queue"
+  binding = "MEDIA_QUEUE"
+
+[observability]
+enabled = true
+head_sampling_rate = 1

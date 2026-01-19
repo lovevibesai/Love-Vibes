@@ -1,0 +1,131 @@
+// Content Moderation Dashboard (Admin)
+// Admin panel for reviewing flagged content and user reports
+
+import { Env } from './index'
+
+export interface ModerationReport {
+    id: string
+    reporter_id: string
+    reported_id: string
+    reported_name: string
+    reason: string
+    details: string
+    timestamp: number
+    status: 'PENDING' | 'REVIEWED' | 'DISMISSED'
+    admin_notes?: string
+    reviewed_by?: string
+    reviewed_at?: number
+}
+
+// GET /admin/moderation/reports - Get all pending reports
+export async function getPendingReports(env: Env, adminId: string): Promise<ModerationReport[]> {
+    // Verify admin status
+    const admin = await env.DB.prepare('SELECT id FROM Users WHERE id = ? AND subscription_tier = ?')
+        .bind(adminId, 'admin')
+        .first()
+
+    if (!admin) {
+        throw new Error('Unauthorized')
+    }
+
+    const results = await env.DB.prepare(
+        `SELECT 
+      r.id,
+      r.reporter_id,
+      r.reported_id,
+      u.name as reported_name,
+      r.reason,
+      r.details,
+      r.timestamp,
+      r.status,
+      r.admin_notes,
+      r.reviewed_by,
+      r.reviewed_at
+    FROM Reports r
+    LEFT JOIN Users u ON r.reported_id = u.id
+    WHERE r.status = 'PENDING'
+    ORDER BY r.timestamp DESC
+    LIMIT 100`
+    ).all()
+
+    return results.results as ModerationReport[]
+}
+
+// POST /admin/moderation/review - Review a report
+export async function reviewReport(
+    env: Env,
+    adminId: string,
+    reportId: string,
+    action: 'DISMISS' | 'BAN_USER' | 'WARN_USER',
+    notes: string
+): Promise<{ success: boolean; message: string }> {
+    // Verify admin status
+    const admin = await env.DB.prepare('SELECT id FROM Users WHERE id = ? AND subscription_tier = ?')
+        .bind(adminId, 'admin')
+        .first()
+
+    if (!admin) {
+        return { success: false, message: 'Unauthorized' }
+    }
+
+    try {
+        const now = Math.floor(Date.now() / 1000)
+
+        // Get report details
+        const report = await env.DB.prepare('SELECT reported_id FROM Reports WHERE id = ?')
+            .bind(reportId)
+            .first()
+
+        if (!report) {
+            return { success: false, message: 'Report not found' }
+        }
+
+        // Update report status
+        await env.DB.prepare(
+            'UPDATE Reports SET status = ?, admin_notes = ?, reviewed_by = ?, reviewed_at = ? WHERE id = ?'
+        )
+            .bind('REVIEWED', notes, adminId, now, reportId)
+            .run()
+
+        // Take action on reported user
+        if (action === 'BAN_USER') {
+            await env.DB.prepare('UPDATE Users SET subscription_tier = ? WHERE id = ?')
+                .bind('banned', report.reported_id)
+                .run()
+        } else if (action === 'WARN_USER') {
+            // Log warning (could send notification)
+            await env.DB.prepare(
+                'INSERT INTO ModerationActions (user_id, action, reason, admin_id, timestamp) VALUES (?, ?, ?, ?, ?)'
+            )
+                .bind(report.reported_id, 'WARNING', notes, adminId, now)
+                .run()
+        }
+
+        return { success: true, message: 'Report reviewed successfully' }
+    } catch (error) {
+        console.error('Report review failed:', error)
+        return { success: false, message: 'Failed to review report' }
+    }
+}
+
+// GET /admin/moderation/stats - Get moderation statistics
+export async function getModerationStats(env: Env, adminId: string): Promise<any> {
+    const admin = await env.DB.prepare('SELECT id FROM Users WHERE id = ? AND subscription_tier = ?')
+        .bind(adminId, 'admin')
+        .first()
+
+    if (!admin) {
+        throw new Error('Unauthorized')
+    }
+
+    const stats = await env.DB.prepare(
+        `SELECT 
+      COUNT(*) as total_reports,
+      SUM(CASE WHEN status = 'PENDING' THEN 1 ELSE 0 END) as pending,
+      SUM(CASE WHEN status = 'REVIEWED' THEN 1 ELSE 0 END) as reviewed,
+      SUM(CASE WHEN status = 'DISMISSED' THEN 1 ELSE 0 END) as dismissed
+    FROM Reports`
+    ).first()
+
+    return stats
+}
