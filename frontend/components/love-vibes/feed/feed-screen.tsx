@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils"
 import { api } from "@/lib/api-client"
 import { useEffect } from "react"
 import { ProximityAlert } from "../proximity/proximity-alert"
+import { EliteGuidance } from "../ui/elite-guidance"
 
 export function FeedScreen() {
   const { mode, setShowMatchModal, setMatchedUser, showMatchModal, matchedUser, setCurrentScreen, loadFeed } = useApp()
@@ -96,13 +97,21 @@ export function FeedScreen() {
             LOVE VIBES
           </span>
         </div>
-        <button
-          onClick={() => setCurrentScreen("filters")}
-          className="w-10 h-10 rounded-full bg-card shadow-card flex items-center justify-center hover:bg-muted transition-colors"
-          aria-label="Filters"
-        >
-          <SlidersHorizontal className="w-5 h-5 text-foreground" />
-        </button>
+        <div className="flex items-center gap-2">
+          <EliteGuidance
+            feature="Sovereign Feed"
+            how="AI-ranked vibration cards curated based on your current signature state."
+            why="Eliminates digital noise to focus exclusively on high-resonance matches."
+            value="Your time is sovereign; we only transmit the most compatible signals."
+          />
+          <button
+            onClick={() => setCurrentScreen("filters")}
+            className="w-10 h-10 rounded-full bg-card shadow-card flex items-center justify-center hover:bg-muted transition-colors"
+            aria-label="Filters"
+          >
+            <SlidersHorizontal className="w-5 h-5 text-foreground" />
+          </button>
+        </div>
       </header>
 
       {/* Card Stack */}

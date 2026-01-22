@@ -8,11 +8,27 @@ export class ChatRoom {
     state: DurableObjectState;
     sessions: WebSocket[];
     env: Env;
+    lastActive: number;
 
     constructor(state: DurableObjectState, env: Env) {
         this.state = state;
         this.env = env;
         this.sessions = [];
+        this.lastActive = Date.now();
+
+        // Auto-hibernate after 30s of inactivity to save costs
+        void (this.state as any).setAlarm(Date.now() + 30 * 1000);
+    }
+
+    async alarm() {
+        if (Date.now() - this.lastActive >= 30 * 1000) {
+            // Close all sessions and hibernate
+            this.sessions.forEach(s => s.close(1001, "Hibernating due to inactivity"));
+            this.sessions = [];
+        } else {
+            // Check again later
+            void (this.state as any).setAlarm(Date.now() + 15 * 1000);
+        }
     }
 
     async fetch(request: Request) {
@@ -39,6 +55,7 @@ export class ChatRoom {
 
         webSocket.addEventListener('message', async (event: MessageEvent) => {
             try {
+                this.lastActive = Date.now();
                 const data = JSON.parse(event.data as string);
 
                 // Broadcast to all other sessions
@@ -53,7 +70,7 @@ export class ChatRoom {
 
                 // 1. Broadcast Real-time
                 this.sessions.forEach(session => {
-                    if (session.readyState === WebSocket.READY_STATE_OPEN) {
+                    if (session.readyState === WebSocket.OPEN) {
                         session.send(msgString);
                     }
                 });
@@ -70,5 +87,23 @@ export class ChatRoom {
         webSocket.addEventListener('close', () => {
             this.sessions = this.sessions.filter(s => s !== webSocket);
         });
+    }
+}
+
+/**
+ * Durable Objects: MatchLobby
+ * Handles waiting room and matchmaking coordination
+ */
+export class MatchLobby {
+    state: DurableObjectState;
+    env: Env;
+
+    constructor(state: DurableObjectState, env: Env) {
+        this.state = state;
+        this.env = env;
+    }
+
+    async fetch(request: Request) {
+        return new Response("Match Lobby Active");
     }
 }

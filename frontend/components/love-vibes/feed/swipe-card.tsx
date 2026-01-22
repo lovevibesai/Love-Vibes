@@ -1,9 +1,8 @@
 "use client"
 
 import React from "react"
-
-import { useState, useRef } from "react"
-import { MapPin, Play, CheckCircle } from "lucide-react"
+import { motion, useMotionValue, useTransform, useAnimation } from "framer-motion"
+import { MapPin, Play, CheckCircle, Heart, X } from "lucide-react"
 import { TrustScore } from "../trust-score"
 import { ModeBadge } from "../mode-badge"
 import type { User } from "@/lib/app-context"
@@ -17,186 +16,149 @@ interface SwipeCardProps {
 }
 
 export function SwipeCard({ user, onSwipe, isTop, onTap }: SwipeCardProps) {
-  const [startX, setStartX] = useState(0)
-  const [currentX, setCurrentX] = useState(0)
-  const [isDragging, setIsDragging] = useState(false)
-  const [swipeDirection, setSwipeDirection] = useState<"left" | "right" | null>(null)
-  const [hasMoved, setHasMoved] = useState(false)
-  const cardRef = useRef<HTMLDivElement>(null)
+  const x = useMotionValue(0)
+  const rotate = useTransform(x, [-200, 200], [-25, 25])
+  const opacity = useTransform(x, [-200, -150, 0, 150, 200], [0, 1, 1, 1, 0])
+  const scale = useTransform(x, [-200, 0, 200], [0.8, 1, 0.8])
 
-  const dragOffset = currentX - startX
-  const threshold = 100
-  const rotation = dragOffset * 0.1
-  const opacity = Math.max(0, 1 - Math.abs(dragOffset) / 300)
+  const likeOpacity = useTransform(x, [50, 150], [0, 1])
+  const nopeOpacity = useTransform(x, [-150, -50], [1, 0])
 
-  const handleTouchStart = (e: React.TouchEvent) => {
-    if (!isTop) return
-    setStartX(e.touches[0].clientX)
-    setIsDragging(true)
-    setHasMoved(false)
-  }
+  const controls = useAnimation()
 
-  const handleTouchMove = (e: React.TouchEvent) => {
-    if (!isDragging || !isTop) return
-    const x = e.touches[0].clientX
-    setCurrentX(x)
-    
-    if (Math.abs(x - startX) > 10) {
-      setHasMoved(true)
-    }
-    
-    if (x - startX > threshold) {
-      setSwipeDirection("right")
-    } else if (x - startX < -threshold) {
-      setSwipeDirection("left")
+  const handleDragEnd = async (_: any, info: any) => {
+    if (Math.abs(info.offset.x) > 100) {
+      const direction = info.offset.x > 0 ? "right" : "left"
+      await controls.start({ x: info.offset.x > 0 ? 1000 : -1000, opacity: 0, transition: { duration: 0.3 } })
+      onSwipe(direction)
     } else {
-      setSwipeDirection(null)
-    }
-  }
-
-  const handleTouchEnd = () => {
-    if (!isDragging || !isTop) return
-    
-    if (Math.abs(dragOffset) > threshold) {
-      onSwipe(dragOffset > 0 ? "right" : "left")
-    } else if (!hasMoved && onTap) {
-      onTap()
-    }
-    
-    setIsDragging(false)
-    setCurrentX(0)
-    setStartX(0)
-    setSwipeDirection(null)
-    setHasMoved(false)
-  }
-
-  const handleMouseDown = (e: React.MouseEvent) => {
-    if (!isTop) return
-    setStartX(e.clientX)
-    setIsDragging(true)
-  }
-
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (!isDragging || !isTop) return
-    const x = e.clientX
-    setCurrentX(x)
-    
-    if (x - startX > threshold) {
-      setSwipeDirection("right")
-    } else if (x - startX < -threshold) {
-      setSwipeDirection("left")
-    } else {
-      setSwipeDirection(null)
-    }
-  }
-
-  const handleMouseUp = () => {
-    handleTouchEnd()
-  }
-
-  const handleMouseLeave = () => {
-    if (isDragging) {
-      handleTouchEnd()
+      controls.start({ x: 0, opacity: 1, scale: 1, transition: { type: "spring", stiffness: 300, damping: 20 } })
+      if (Math.abs(info.offset.x) < 5 && onTap) {
+        onTap()
+      }
     }
   }
 
   return (
-    <div
-      ref={cardRef}
-      className={cn(
-        "absolute inset-x-4 top-0 bg-card rounded-3xl overflow-hidden shadow-card transition-transform",
-        !isDragging && "transition-all duration-300",
-        !isTop && "scale-[0.95] translate-y-4 opacity-70"
-      )}
+    <motion.div
+      drag={isTop ? "x" : false}
+      dragConstraints={{ left: 0, right: 0 }}
+      onDragEnd={handleDragEnd}
+      animate={controls}
       style={{
-        height: "calc(100% - 100px)",
-        transform: isTop && isDragging
-          ? `translateX(${dragOffset}px) rotate(${rotation}deg)`
-          : undefined,
-        opacity: isTop && isDragging ? opacity : undefined,
+        x,
+        rotate,
+        opacity: isTop ? opacity : 0.6,
+        scale: isTop ? 1 : 0.95,
         zIndex: isTop ? 10 : 1,
         touchAction: "none",
       }}
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
-      onMouseDown={handleMouseDown}
-      onMouseMove={handleMouseMove}
-      onMouseUp={handleMouseUp}
-      onMouseLeave={handleMouseLeave}
+      className={cn(
+        "absolute inset-x-2 top-0 h-[calc(100%-120px)] rounded-[32px] overflow-hidden shadow-2xl bg-card border border-white/10",
+        !isTop && "translate-y-4"
+      )}
     >
       {/* Swipe Indicators */}
-      {isTop && swipeDirection && (
-        <div className={cn(
-          "absolute top-8 z-20 px-6 py-2 rounded-lg border-4 font-bold text-xl uppercase",
-          "transform -rotate-12",
-          swipeDirection === "right"
-            ? "left-4 border-trust-high text-trust-high bg-trust-high/10"
-            : "right-4 border-destructive text-destructive bg-destructive/10 rotate-12"
-        )}>
-          {swipeDirection === "right" ? "Like" : "Pass"}
-        </div>
-      )}
+      <motion.div
+        style={{ opacity: likeOpacity }}
+        className="absolute top-10 left-10 z-30 px-6 py-2 rounded-2xl border-4 border-emerald-400 bg-emerald-400/20 backdrop-blur-md -rotate-12"
+      >
+        <span className="text-3xl font-black text-emerald-400 uppercase tracking-widest italic">LIKE</span>
+      </motion.div>
 
-      {/* Photo */}
-      <div className="relative h-[60%]">
+      <motion.div
+        style={{ opacity: nopeOpacity }}
+        className="absolute top-10 right-10 z-30 px-6 py-2 rounded-2xl border-4 border-rose-500 bg-rose-500/20 backdrop-blur-md rotate-12"
+      >
+        <span className="text-3xl font-black text-rose-500 uppercase tracking-widest italic">NOPE</span>
+      </motion.div>
+
+      {/* Photo & Mesh Gradient Base */}
+      <div className="relative h-full w-full">
+        <div className={cn(
+          "absolute inset-0 opacity-20",
+          user.mode === "dating" ? "mesh-gradient-dating" : "mesh-gradient-friendship"
+        )} />
+
         <img
           src={user.photoUrl || "/placeholder.svg"}
           alt={user.name}
           className="w-full h-full object-cover"
           draggable={false}
         />
-        
-        {/* Gradient Overlay */}
-        <div className="absolute inset-0 bg-gradient-to-t from-foreground/90 via-foreground/30 to-transparent" />
-        
-        {/* Trust Score - Top Left */}
-        <div className="absolute top-4 left-4">
-          <TrustScore score={user.trustScore} size="md" />
+
+        {/* Premium Overlay */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/20 to-transparent" />
+
+        {/* Top Badges */}
+        <div className="absolute top-6 left-6 right-6 flex justify-between items-start z-20">
+          <div className="flex flex-col gap-2">
+            <div className="glass-dark rounded-2xl p-1">
+              <TrustScore score={user.trustScore} size="md" />
+            </div>
+            {user.compatibilityScore && (
+              <div className="glass-elevated rounded-xl px-2 py-1 flex items-center gap-1.5 border-rose-500/30">
+                <div className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
+                <span className="text-[10px] font-black text-rose-500 uppercase tracking-wider">{user.compatibilityScore}% Chemistry</span>
+              </div>
+            )}
+          </div>
+          <div className="glass-dark rounded-2xl px-3 py-1.5 flex items-center gap-2">
+            <ModeBadge mode={user.mode} size="md" />
+          </div>
         </div>
-        
-        {/* Mode Badge - Top Right */}
-        <div className="absolute top-4 right-4">
-          <ModeBadge mode={user.mode} size="md" />
-        </div>
-        
-        {/* Video Button */}
+
+        {/* Video Pulse Intro */}
         {(user.videoUrl || user.hasVideoIntro) && (
-          <button 
-            className="absolute bottom-4 right-4 w-12 h-12 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center hover:bg-white/30 transition-colors"
-            aria-label="Play video intro"
+          <button
+            className="absolute bottom-32 right-6 w-14 h-14 rounded-full glass-elevated flex items-center justify-center hover:scale-110 transition-transform active:scale-95 group"
             onClick={(e) => {
               e.stopPropagation()
-              // Video would play here in production
             }}
           >
-            <Play className="w-6 h-6 text-white ml-1" fill="currentColor" />
+            <div className="absolute inset-0 rounded-full bg-primary/20 animate-ping" />
+            <Play className="w-6 h-6 text-white ml-1 relative z-10" fill="currentColor" />
           </button>
         )}
-        
-        {/* Profile Info */}
-        <div className="absolute bottom-4 left-4 right-16">
-          <div className="flex items-center gap-2 mb-1">
-            <h2 className="text-2xl font-bold text-white">
+
+        {/* Content Box */}
+        <div className="absolute bottom-0 left-0 right-0 p-8 pt-20 bg-gradient-to-t from-black via-black/80 to-transparent">
+          {user.matchReason && (
+            <div className="flex items-center gap-2 mb-3">
+              <span className="px-2 py-0.5 rounded-full bg-primary/20 text-[10px] font-bold text-primary uppercase tracking-widest border border-primary/20">
+                AI Insight
+              </span>
+              <span className="text-xs font-bold text-white/90 italic">
+                "{user.matchReason}"
+              </span>
+            </div>
+          )}
+          <div className="flex items-center gap-3 mb-2">
+            <h2 className="text-3xl font-black text-white tracking-tight leading-none">
               {user.name}, {user.age}
             </h2>
             {user.isVerified && (
-              <CheckCircle className="w-5 h-5 text-gold" fill="currentColor" />
+              <CheckCircle className="w-6 h-6 text-amber-400" fill="currentColor" />
             )}
           </div>
-          <div className="flex items-center gap-1 text-white/80 text-sm">
-            <MapPin className="w-4 h-4" />
-            <span>{user.distance}</span>
+
+          <div className="flex items-center gap-2 text-white/60 mb-4 font-medium">
+            <div className="flex items-center gap-1 bg-white/10 px-2 py-1 rounded-lg backdrop-blur-sm">
+              <MapPin className="w-3.5 h-3.5" />
+              <span className="text-xs uppercase tracking-wider">{user.distance} AWAY</span>
+            </div>
+            {user.interests && JSON.parse(user.interests as any).slice(0, 1).map((interest: string) => (
+              <div key={interest} className="bg-primary/20 px-2 py-1 rounded-lg backdrop-blur-sm text-primary text-xs uppercase tracking-wider">
+                {interest}
+              </div>
+            ))}
           </div>
+
+          <p className="text-white/80 text-sm leading-relaxed line-clamp-2 font-medium">
+            {user.bio}
+          </p>
         </div>
       </div>
-      
-      {/* Bio Section */}
-      <div className="p-5 bg-card">
-        <p className="text-foreground/80 text-sm leading-relaxed line-clamp-3">
-          {user.bio}
-        </p>
-      </div>
-    </div>
+    </motion.div>
   )
 }

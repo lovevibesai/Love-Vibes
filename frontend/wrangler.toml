@@ -1,0 +1,6 @@
+name = "love-vibes-frontend"
+compatibility_date = "2025-01-18"
+pages_build_output_dir = ".next"
+
+[vars]
+NEXT_PUBLIC_API_URL = "https://love-vibes-backend.xxxx.workers.dev" # Replace with actual backend URL after deployment

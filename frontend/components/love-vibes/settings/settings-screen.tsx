@@ -13,6 +13,7 @@ import {
   Bell,
   Shield,
   User,
+  Users,
   LogOut,
   Trash2,
   ChevronRight,
@@ -130,102 +131,7 @@ export function SettingsScreen() {
           </div>
         </section>
 
-        {/* Innovative Features Section */}
-        <section className="p-4 border-b border-border">
-          <h2 className="text-sm font-medium text-muted-foreground mb-3 uppercase tracking-wide">Innovative Features</h2>
-          <div className="bg-card rounded-xl shadow-card overflow-hidden divide-y divide-border">
-            <button
-              className="w-full flex items-center justify-between p-4 hover:bg-muted/30 transition-colors"
-              onClick={() => setCurrentScreen("vibe-windows")}
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                  <Clock className="w-5 h-5 text-primary" />
-                </div>
-                <div className="text-left">
-                  <p className="font-medium text-foreground">Vibe Windows</p>
-                  <p className="text-sm text-muted-foreground">Schedule your matching times</p>
-                </div>
-              </div>
-              <ChevronRight className="w-5 h-5 text-muted-foreground" />
-            </button>
-            <button
-              className="w-full flex items-center justify-between p-4 hover:bg-muted/30 transition-colors"
-              onClick={() => setCurrentScreen("voice-feed")}
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                  <span className="text-xl">🎤</span>
-                </div>
-                <div className="text-left">
-                  <p className="font-medium text-foreground">Voice-First Matching</p>
-                  <p className="text-sm text-muted-foreground">Match on voice before photos</p>
-                </div>
-              </div>
-              <ChevronRight className="w-5 h-5 text-muted-foreground" />
-            </button>
-            <button
-              className="w-full flex items-center justify-between p-4 hover:bg-muted/30 transition-colors"
-              onClick={() => setCurrentScreen("success-stories")}
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                  <span className="text-xl">💕</span>
-                </div>
-                <div className="text-left">
-                  <p className="font-medium text-foreground">Success Stories</p>
-                  <p className="text-sm text-muted-foreground">Real couples, real love</p>
-                </div>
-              </div>
-              <ChevronRight className="w-5 h-5 text-muted-foreground" />
-            </button>
-            <button
-              className="w-full flex items-center justify-between p-4 hover:bg-muted/30 transition-colors"
-              onClick={() => setCurrentScreen("referral-dashboard")}
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                  <span className="text-xl">🎁</span>
-                </div>
-                <div className="text-left">
-                  <p className="font-medium text-foreground">Referral Dashboard</p>
-                  <p className="text-sm text-muted-foreground">Earn credits by inviting friends</p>
-                </div>
-              </div>
-              <ChevronRight className="w-5 h-5 text-muted-foreground" />
-            </button>
-            <button
-              className="w-full flex items-center justify-between p-4 hover:bg-muted/30 transition-colors"
-              onClick={() => setCurrentScreen("chemistry-test")}
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                  <span className="text-xl">💓</span>
-                </div>
-                <div className="text-left">
-                  <p className="font-medium text-foreground">Chemistry Test</p>
-                  <p className="text-sm text-muted-foreground">Heart rate sync detection (Demo)</p>
-                </div>
-              </div>
-              <ChevronRight className="w-5 h-5 text-muted-foreground" />
-            </button>
-            <button
-              className="w-full flex items-center justify-between p-4 hover:bg-muted/30 transition-colors"
-              onClick={() => setCurrentScreen("mutual-friends")}
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                  <span className="text-xl">👥</span>
-                </div>
-                <div className="text-left">
-                  <p className="font-medium text-foreground">Mutual Friends</p>
-                  <p className="text-sm text-muted-foreground">Trusted introductions</p>
-                </div>
-              </div>
-              <ChevronRight className="w-5 h-5 text-muted-foreground" />
-            </button>
-          </div>
-        </section>
+
 
         {/* Notifications Section */}
         <section className="p-4 border-b border-border">

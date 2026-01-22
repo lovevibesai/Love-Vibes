@@ -1,9 +1,9 @@
 "use client"
 
-import { createContext, useContext, useState, type ReactNode } from "react"
+import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
 
 export type AppMode = "dating" | "friendship"
-export type AppScreen = "welcome" | "phone" | "mode" | "profile-setup" | "prompts" | "video" | "location" | "feed" | "matches" | "chat" | "profile" | "settings" | "filters" | "credits" | "expanded-profile" | "location-settings" | "visibility-settings" | "notification-settings" | "blocked-users" | "privacy-policy" | "terms-of-service" | "help-center" | "vibe-windows" | "voice-feed" | "success-stories" | "referral-dashboard" | "chemistry-test" | "mutual-friends" | "boost"
+export type AppScreen = "welcome" | "phone" | "mode" | "profile-setup" | "prompts" | "video" | "location" | "feed" | "matches" | "chat" | "profile" | "settings" | "filters" | "credits" | "expanded-profile" | "location-settings" | "visibility-settings" | "notification-settings" | "blocked-users" | "privacy-policy" | "terms-of-service" | "help-center" | "vibe-windows" | "voice-feed" | "success-stories" | "referral-dashboard" | "chemistry-test" | "mutual-friends" | "boost" | "innovative-features" | "identity-signature" | "social-endorsements"
 
 export interface User {
   id: string
@@ -87,6 +87,9 @@ interface AppContextType {
   user: User
   updateUser: (updates: Partial<User>) => Promise<void>
   login: (phone: string) => Promise<void>
+  registerPasskey: (email: string) => Promise<void>
+  loginWithEmail: (email: string) => Promise<void>
+  verifyEmailOTP: (email: string, otp: string) => Promise<void>
   loadFeed: (lat: number, long: number) => Promise<any[] | undefined>
 }
 
@@ -182,48 +185,118 @@ const mockMatches: Match[] = [
 ]
 
 import { api } from "./api-client"
+import { startRegistration, startAuthentication } from "@simplewebauthn/browser"
 
 export function AppProvider({ children }: { children: ReactNode }) {
-  const [currentScreen, setCurrentScreen] = useState<AppScreen>("welcome")
+  const [currentScreen, setCurrentScreen] = useState<AppScreen>(() => {
+    if (typeof window !== 'undefined' && localStorage.getItem('auth_token')) return "feed";
+    return "welcome";
+  })
   const [mode, setMode] = useState<AppMode>("dating")
-  const [isOnboarded, setIsOnboarded] = useState(false)
+  const [isOnboarded, setIsOnboarded] = useState(() => {
+    if (typeof window !== 'undefined' && localStorage.getItem('auth_token')) return true;
+    return false;
+  })
   const [currentUser, setCurrentUser] = useState<User | null>(null)
   const [matches, setMatches] = useState<Match[]>(mockMatches)
   const [showMatchModal, setShowMatchModal] = useState(false)
   const [matchedUser, setMatchedUser] = useState<User | null>(null)
   const [user, setUser] = useState<User>(defaultUser)
 
+  // Session Restoration & Dev Tools Sync
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const token = localStorage.getItem('auth_token');
+      const storedUserId = localStorage.getItem('user_id');
+      const simulatedMatch = localStorage.getItem('simulated_match');
+
+      if (token && storedUserId) {
+        // In a real app, we'd fetch profile here. 
+        // For dev convenience, we'll just set as onboarded if token exists
+        setIsOnboarded(true);
+        setCurrentScreen("feed");
+      }
+
+      if (simulatedMatch) {
+        try {
+          const matchUser = JSON.parse(simulatedMatch);
+          setMatchedUser(matchUser);
+          setShowMatchModal(true);
+          localStorage.removeItem('simulated_match'); // Clear it after use
+        } catch (e) {
+          console.error("Failed to parse simulated match", e);
+        }
+      }
+
+      // Clear skip_splash if it was set
+      localStorage.removeItem('skip_splash');
+    }
+  }, []);
+
   // Real Integration
   const login = async (phone: string) => {
     try {
-      const data = await api.auth.login(phone);
-      if (data.is_new_user) {
-        setCurrentScreen("profile-setup");
-      } else {
-        setCurrentScreen("feed");
-        setIsOnboarded(true);
-      }
-
-      // Map backend user to frontend User type
-      const mappedUser: User = {
-        ...defaultUser,
-        id: data._id || data.id,
-        name: data.name,
-        age: data.age,
-        bio: data.bio,
-        photoUrl: data.main_photo_url || data.photoUrl,
-        photos: data.photo_urls ? JSON.parse(data.photo_urls) : [],
-        credits: data.credits_balance || 0,
-        isVerified: !!data.is_verified,
-        mode: data.mode === 1 ? "friendship" : "dating",
-      };
-
-      setUser(mappedUser);
-      setCurrentUser(mappedUser);
+      const data = await api.auth.loginLegacy(phone);
+      handleAuthenticatedUser(data);
     } catch (e) {
       console.error("Login failed", e);
       throw e;
     }
+  }
+
+  const registerPasskey = async (email: string) => {
+    try {
+      const userId = currentUser?.id || crypto.randomUUID();
+      const options = await api.auth.getRegisterOptions(userId, email);
+      const regResp = await startRegistration(options);
+      const verifyResp = await api.auth.verifyRegister(userId, email, regResp);
+
+      if (verifyResp.success) {
+        handleAuthenticatedUser(verifyResp);
+      }
+    } catch (e) {
+      console.error("Passkey registration failed", e);
+      throw e;
+    }
+  }
+
+  const loginWithEmail = async (email: string) => {
+    await api.auth.loginEmail(email);
+  }
+
+  const verifyEmailOTP = async (email: string, otp: string) => {
+    const data = await api.auth.verifyEmailOTP(email, otp);
+    if (data.success) {
+      handleAuthenticatedUser(data);
+    } else {
+      throw new Error("Invalid OTP");
+    }
+  }
+
+  const handleAuthenticatedUser = (data: any) => {
+    if (data.is_new_user) {
+      setCurrentScreen("profile-setup");
+    } else {
+      setCurrentScreen("feed");
+      setIsOnboarded(true);
+    }
+
+    // Map backend user to frontend User type
+    const mappedUser: User = {
+      ...defaultUser,
+      id: data._id || data.id,
+      name: data.name,
+      age: data.age,
+      bio: data.bio,
+      photoUrl: data.main_photo_url || data.photoUrl,
+      photos: data.photo_urls ? JSON.parse(data.photo_urls) : [],
+      credits: data.credits_balance || 0,
+      isVerified: !!data.is_verified,
+      mode: data.mode === 1 ? "friendship" : "dating",
+    };
+
+    setUser(mappedUser);
+    setCurrentUser(mappedUser);
   }
 
   const loadFeed = async (lat: number, long: number) => {
@@ -275,6 +348,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         user,
         updateUser,
         login,
+        registerPasskey,
+        loginWithEmail,
+        verifyEmailOTP,
         loadFeed
       }}
     >

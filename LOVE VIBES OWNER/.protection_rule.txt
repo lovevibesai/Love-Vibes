@@ -1,0 +1,7 @@
+# PROTECTED DIRECTORY RULE
+
+1. **NO MOVING**: Never move this folder or its contents.
+2. **NO MODIFICATION**: Do not rename or delete any files in this folder.
+3. **READ-ONLY FOR AI**: If an AI assistant needs data from these files, it should perform a **COPY** operation to its working directory.
+
+This folder is for the OWNER's manual storage and project blueprints.

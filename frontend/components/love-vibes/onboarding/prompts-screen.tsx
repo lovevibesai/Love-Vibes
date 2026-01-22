@@ -7,6 +7,14 @@ import { ArrowLeft } from "lucide-react"
 import { PromptSelection } from "@/components/love-vibes/profile/prompt-selection"
 import { api } from "@/lib/api-client"
 
+const FALLBACK_PROMPTS = [
+    { id: 'f1', prompt_text: 'Two truths and a lie', category: 'fun' },
+    { id: 'f2', prompt_text: 'My simple pleasures', category: 'lifestyle' },
+    { id: 'f3', prompt_text: 'The way to win me over is...', category: 'personality' },
+    { id: 'f4', prompt_text: 'My perfect day', category: 'lifestyle' },
+    { id: 'f5', prompt_text: 'I geek out on...', category: 'personality' },
+]
+
 export function PromptsScreen() {
     const { setCurrentScreen, user } = useApp()
     const [prompts, setPrompts] = useState<any[]>([])
@@ -19,9 +27,15 @@ export function PromptsScreen() {
     const loadPrompts = async () => {
         try {
             const data = await api.prompts.getAll()
-            setPrompts(data)
+            if (Array.isArray(data) && data.length > 0) {
+                setPrompts(data)
+            } else {
+                // Fallback to static prompts if API returns empty
+                setPrompts(FALLBACK_PROMPTS)
+            }
         } catch (e) {
-            console.error("Failed to load prompts", e)
+            console.error("Failed to load prompts, using fallback", e)
+            setPrompts(FALLBACK_PROMPTS)
         } finally {
             setLoading(false)
         }
@@ -29,7 +43,8 @@ export function PromptsScreen() {
 
     const handleComplete = async (responses: Array<{ prompt_id: string; response_text: string; display_order: number }>) => {
         try {
-            await api.prompts.saveResponses(user.id, responses)
+            const userId = user?.id || "self"
+            await api.prompts.saveResponses(userId, responses)
             setCurrentScreen("video")
         } catch (e) {
             console.error("Failed to save prompts", e)

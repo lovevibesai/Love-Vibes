@@ -51,8 +51,31 @@ function calculateCompatibility(u1: any, u2: any): number {
     return Math.min(100, Math.max(60, Math.floor(score))); // Keep it positive (60-100%)
 }
 
+async function calculateSemanticScore(env: Env, text1: string, text2: string): Promise<number> {
+    try {
+        const response: any = await env.AI.run('@cf/baai/bge-base-en-v1.5', {
+            text: [text1, text2]
+        });
+        const [v1, v2] = response.data;
+
+        // Cosine Similarity
+        let dotProduct = 0;
+        let mag1 = 0;
+        let mag2 = 0;
+        for (let i = 0; i < v1.length; i++) {
+            dotProduct += v1[i] * v2[i];
+            mag1 += v1[i] * v1[i];
+            mag2 += v2[i] * v2[i];
+        }
+        const similarity = dotProduct / (Math.sqrt(mag1) * Math.sqrt(mag2));
+        return Math.floor(similarity * 100);
+    } catch (e) {
+        return 70; // Default sibling "vibe" if AI fails
+    }
+}
+
 export async function handleFeed(request: Request, env: Env): Promise<Response> {
-    const userId = await verifyAuth(request);
+    const userId = await verifyAuth(request, env);
     if (!userId) return new Response("Unauthorized", { status: 401 });
 
     // Get current user's profile to know their preferences
@@ -67,51 +90,47 @@ export async function handleFeed(request: Request, env: Env): Promise<Response> 
     const currentCell = latLonToCellId(currentUser.lat || 0, currentUser.long || 0);
     const cellsToQuery = getNeighboringCells(currentCell);
 
-    // 2. Fetch User Preferences for Discovery
-    const { results: prefsResults } = await env.DB.prepare(
-        "SELECT * FROM UserPreferences WHERE user_id = ?"
-    ).bind(userId).all();
+    // 2. Fetch User Discovery Metadata (Cache Key)
+    const cacheKey = `feed_cache:${currentCell}:${currentUser.mode}`;
+    let feedRaw: any[] = [];
 
-    const prefs: any = prefsResults[0] || {
-        distance_max: 50,
-        age_min: 18,
-        age_max: 99,
-        show_me: 'everyone'
-    };
+    // 3. Try KV Cache first
+    const cachedData = await env.GEO_KV.get(cacheKey);
+    if (cachedData) {
+        feedRaw = JSON.parse(cachedData);
+    } else {
+        // 4. Cache Miss - Query D1
+        const { results } = await env.DB.prepare(
+            "SELECT id, name, age, bio, photo_urls, s2_cell_id, mode, trust_score, location, relationship_goals, interests, height, drinking, smoking, exercise_frequency, diet, pets, star_sign " +
+            "FROM Users " +
+            "WHERE s2_cell_id IN (" + cellsToQuery.map(() => '?').join(',') + ") " +
+            "AND mode = ? " +
+            "LIMIT 100" // Fetch more to allow for filtering
+        ).bind(...cellsToQuery, currentUser.mode).all();
 
-    // 3. Query D1
-    const queryParts = [
-        "SELECT id, name, age, bio, photo_urls, s2_cell_id, mode, trust_score, location, relationship_goals, interests, height, drinking, smoking, exercise_frequency, diet, pets, star_sign",
-        "FROM Users",
-        "WHERE s2_cell_id IN (" + cellsToQuery.map(() => '?').join(',') + ")",
-        "AND id != ?",
-        "AND mode = ?",
-        "AND (age >= ? AND age <= ?)",
-        "AND id NOT IN (SELECT target_id FROM Swipes WHERE actor_id = ?)"
-    ];
+        feedRaw = results;
 
-    const params: any[] = [...cellsToQuery, userId, currentUser.mode, prefs.age_min, prefs.age_max, userId];
+        // Save to KV for 10 minutes
+        await env.GEO_KV.put(cacheKey, JSON.stringify(feedRaw), { expirationTtl: 600 });
+    }
 
-    // Optional Filters
-    if (prefs.height_min) { queryParts.push("AND (height >= ? OR height IS NULL)"); params.push(prefs.height_min); }
-    if (prefs.height_max) { queryParts.push("AND (height <= ? OR height IS NULL)"); params.push(prefs.height_max); }
-    if (prefs.show_verified_only) { queryParts.push("AND is_verified = 1"); }
+    // 5. In-Memory Filtering & Match Scoring (Personalization)
+    const baseFeed = feedRaw.filter((user: any) => user.id !== userId);
 
-    queryParts.push("LIMIT 40");
+    // 6. Semantic Enhancement (Async Parallel)
+    const feed = await Promise.all(baseFeed.slice(0, 20).map(async (user: any) => {
+        const baseScore = calculateCompatibility(currentUser, user);
+        const semanticScore = await calculateSemanticScore(env, currentUser.bio || "", user.bio || "");
 
-    const { results: feedRaw } = await env.DB.prepare(queryParts.join(' '))
-        .bind(...params)
-        .all();
-
-    // 4. Transform & Score (AI Smart Match)
-    const feed = feedRaw.map((user: any) => ({
-        ...user,
-        compatibility_score: calculateCompatibility(currentUser, user),
-        match_reason: "High interest overlap" // In real app, generate based on calculation
-    })).sort((a: any, b: any) => b.compatibility_score - a.compatibility_score);
+        return {
+            ...user,
+            compatibility_score: Math.floor((baseScore * 0.7) + (semanticScore * 0.3)),
+            match_reason: semanticScore > 80 ? "Deep personality match" : "Shared interests"
+        };
+    }));
 
     return new Response(JSON.stringify({
-        meta: { status: 200, count: feed.length },
+        meta: { status: 200, count: feed.length, source: cachedData ? 'cache' : 'db' },
         data: {
             results: feed
         }

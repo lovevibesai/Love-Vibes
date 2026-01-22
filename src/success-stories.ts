@@ -84,5 +84,5 @@ export async function getSuccessStories(env: Env, limit: number = 20): Promise<S
         .bind(limit)
         .all()
 
-    return results.results as SuccessStory[]
+    return results.results as unknown as SuccessStory[]
 }

@@ -14,7 +14,7 @@ function latLonToCellId(lat: number, lon: number, level: number = 12): string {
 }
 
 export async function handleUserUpdate(request: Request, env: Env): Promise<Response> {
-    const userId = await verifyAuth(request);
+    const userId = await verifyAuth(request, env);
     if (!userId) return new Response("Unauthorized", { status: 401 });
 
     const url = new URL(request.url);

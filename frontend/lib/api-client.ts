@@ -22,21 +22,56 @@ async function apiRequest(endpoint: string, options: RequestInit = {}) {
         ...options.headers,
     };
 
-    const response = await fetch(`${API_URL}${endpoint}`, {
-        ...options,
-        headers,
-    });
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), 8000); // 8 second timeout
 
-    if (!response.ok) {
-        throw new Error(`API Error: ${response.statusText}`);
+    try {
+        const response = await fetch(`${API_URL}${endpoint}`, {
+            ...options,
+            headers,
+            signal: controller.signal
+        });
+        clearTimeout(id);
+
+        if (!response.ok) {
+            throw new Error(`API Error: ${response.statusText}`);
+        }
+
+        return response.json();
+    } catch (e) {
+        clearTimeout(id);
+        throw e;
     }
-
-    return response.json();
 }
 
 export const api = {
     auth: {
-        login: async (phoneNumber: string) => {
+        getRegisterOptions: async (userId?: string, email?: string) => {
+            return apiRequest(`/v2/auth/register/options?user_id=${userId || ''}&email=${email || ''}`);
+        },
+        verifyRegister: async (userId: string, email: string, response: any) => {
+            return apiRequest('/v2/auth/register/verify', {
+                method: 'POST',
+                body: JSON.stringify({ user_id: userId, email, response }),
+            });
+        },
+        loginEmail: async (email: string) => {
+            return apiRequest('/v2/auth/login/email', {
+                method: 'POST',
+                body: JSON.stringify({ email }),
+            });
+        },
+        verifyEmailOTP: async (email: string, otp: string) => {
+            const res = await apiRequest('/v2/auth/login/email/verify', {
+                method: 'POST',
+                body: JSON.stringify({ email, otp }),
+            });
+            if (res.success && res.token) {
+                localStorage.setItem('auth_token', res.token);
+            }
+            return res;
+        },
+        loginLegacy: async (phoneNumber: string) => {
             const res = await apiRequest('/v2/auth/login/sms', {
                 method: 'POST',
                 body: JSON.stringify({ phone_number: phoneNumber }),
@@ -128,10 +163,16 @@ export const api = {
         }
     },
     media: {
-        upload: async (file: File, type: 'photo' | 'video' = 'photo') => {
+        getVideoUploadUrl: async () => {
+            return apiRequest('/v2/media/video-upload-url');
+        },
+        upload: async (file: File, type: 'photo' | 'video' = 'photo', streamUid?: string) => {
             const formData = new FormData();
             formData.append('file', file);
             formData.append('type', type);
+            if (streamUid) {
+                formData.append('stream_uid', streamUid);
+            }
 
             // Note: When sending FormData, the browser automatically sets 
             // the correct Content-Type with boundary. We must NOT set it manually.
@@ -163,6 +204,17 @@ export const api = {
         },
         getUserPrompts: async (userId: string) => {
             return apiRequest(`/v2/user/${userId}/prompts`);
+        }
+    },
+    referrals: {
+        getStats: async (userId: string) => {
+            return apiRequest(`/v2/referrals/stats?userId=${userId}`);
+        },
+        unlock: async (userId: string, scenarioType: 'intimate' | 'mystical') => {
+            return apiRequest('/v2/referrals/unlock', {
+                method: 'POST',
+                body: JSON.stringify({ userId, scenarioType })
+            });
         }
     }
 };

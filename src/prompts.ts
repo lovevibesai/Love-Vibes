@@ -25,7 +25,7 @@ export async function getPrompts(env: Env): Promise<ProfilePrompt[]> {
         'SELECT id, prompt_text, category, is_active FROM ProfilePrompts WHERE is_active = TRUE ORDER BY category, id'
     ).all()
 
-    return results.results as ProfilePrompt[]
+    return results.results as unknown as ProfilePrompt[]
 }
 
 // POST /api/user/prompts - Save user's prompt responses

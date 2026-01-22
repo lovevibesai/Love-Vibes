@@ -35,10 +35,14 @@ interface LoveVibesSplashProps {
 
 export function LoveVibesSplash({ onComplete }: LoveVibesSplashProps) {
   const [phase, setPhase] = useState(0)
-  const [particles] = useState(() => generateParticles(80))
+  const [particles, setParticles] = useState<Particle[]>([])
   const [canSkip, setCanSkip] = useState(false)
   const [isExiting, setIsExiting] = useState(false)
   const [showContent, setShowContent] = useState(false)
+
+  useEffect(() => {
+    setParticles(generateParticles(80))
+  }, [])
   const heartControls = useAnimation()
   const containerRef = useRef<HTMLDivElement>(null)
 
@@ -96,6 +100,16 @@ export function LoveVibesSplash({ onComplete }: LoveVibesSplashProps) {
     setPrefersReducedMotion(mediaQuery.matches)
   }, [])
 
+  // Auto-advance for reduced motion preference
+  useEffect(() => {
+    if (prefersReducedMotion && !isExiting) {
+      const timer = setTimeout(() => {
+        handleComplete()
+      }, 3000)
+      return () => clearTimeout(timer)
+    }
+  }, [prefersReducedMotion, isExiting, handleComplete])
+
   if (prefersReducedMotion) {
     return (
       <AnimatePresence>
@@ -113,11 +127,8 @@ export function LoveVibesSplash({ onComplete }: LoveVibesSplashProps) {
             tabIndex={0}
           >
             <div className="flex flex-col items-center gap-8">
-              <img
-                src="/images/love-20vibes-20the-20logo.png"
-                alt="Love Vibes"
-                className="w-48 h-48 object-contain"
-              />
+              {/* Fallback text if image missing */}
+              <h1 className="text-2xl font-bold text-[#D4AF37] tracking-[0.2em]">LOVE VIBES</h1>
             </div>
           </motion.div>
         )}
@@ -140,7 +151,7 @@ export function LoveVibesSplash({ onComplete }: LoveVibesSplashProps) {
       transition: {
         duration: 0.5,
         delay: i * 0.08,
-        ease: [0.22, 1, 0.36, 1],
+        ease: [0.22, 1, 0.36, 1] as const,
       },
     }),
   }

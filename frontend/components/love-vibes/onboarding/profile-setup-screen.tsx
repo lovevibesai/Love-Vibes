@@ -1,11 +1,28 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useRef } from "react"
 import { useApp } from "@/lib/app-context"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
-import { ArrowLeft, Camera, Plus, X, MapPin, Heart, Wine, Cigarette, Dumbbell, UtensilsCrossed, Dog, Languages } from "lucide-react"
+import { motion, AnimatePresence } from "framer-motion"
+import {
+  ArrowLeft,
+  Camera,
+  Plus,
+  X,
+  MapPin,
+  Heart,
+  Wine,
+  Cigarette,
+  Dumbbell,
+  UtensilsCrossed,
+  Dog,
+  Languages,
+  User,
+  Activity,
+  Zap,
+  Briefcase,
+  GraduationCap,
+  Layers
+} from "lucide-react"
 import { cn } from "@/lib/utils"
 import {
   Select,
@@ -15,7 +32,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { api } from "@/lib/api-client"
-import { useRef } from "react"
+import { toast } from "sonner"
 
 // Interest categories and tags
 const INTEREST_CATEGORIES = {
@@ -30,11 +47,11 @@ const INTEREST_CATEGORIES = {
 const ALL_INTERESTS = Object.values(INTEREST_CATEGORIES).flat()
 
 const RELATIONSHIP_GOALS = [
-  { value: "long-term", label: "Long-term relationship", icon: "❤️" },
-  { value: "casual", label: "Something casual", icon: "😊" },
-  { value: "friendship", label: "New friends", icon: "👋" },
-  { value: "marriage", label: "Marriage", icon: "💍" },
-  { value: "open", label: "Open to anything", icon: "✨" },
+  { value: "long-term", label: "Elite Long-term", icon: "❤️" },
+  { value: "casual", label: "Casual Synergy", icon: "😊" },
+  { value: "friendship", label: "Elite Socials", icon: "👋" },
+  { value: "marriage", label: "Eternal Bond", icon: "💍" },
+  { value: "open", label: "Open Exploration", icon: "✨" },
 ]
 
 export function ProfileSetupScreen() {
@@ -81,7 +98,7 @@ export function ProfileSetupScreen() {
       setPhotos(newPhotos)
     } catch (e) {
       console.error("Upload failed", e)
-      alert("Photo upload failed. Please check your connection.")
+      toast.error("Photo link failure: Protocol interrupted")
     } finally {
       setUploadingIndex(null)
     }
@@ -117,7 +134,6 @@ export function ProfileSetupScreen() {
   }
 
   const handleContinue = async () => {
-    // Convert height to cm
     const heightCm = heightFt && heightIn
       ? Math.round((parseInt(heightFt) * 30.48) + (parseInt(heightIn) * 2.54))
       : undefined
@@ -147,17 +163,14 @@ export function ProfileSetupScreen() {
 
     try {
       await setCurrentUser({ ...updates, id: "self", trustScore: 0, isVerified: false, credits: 0 })
-      // The updates object is mapped to backend fields in AppContext.updateUser
-      // But here we'll directly call it to be sure
-      // await api.user.updateProfile(updates);
       setCurrentScreen("prompts")
     } catch (e) {
-      console.error("Profile update failed", e)
+      toast.error("Sync error: Failed to commit persona data")
     }
   }
 
   return (
-    <div className="min-h-screen bg-[#F6EDEE] dark:bg-[#1A0814] overflow-y-auto relative flex flex-col items-center">
+    <div className="h-full flex flex-col bg-[#1A0814] overflow-hidden relative font-sans select-none">
       <input
         type="file"
         ref={fileInputRef}
@@ -168,319 +181,291 @@ export function ProfileSetupScreen() {
           handlePhotoUpload(e, index)
         }}
       />
-      <div className="w-full max-w-md min-h-screen relative flex flex-col bg-[#F6EDEE] dark:bg-[#1A0814] text-[#2A0D1F] dark:text-[#F6EDEE] shadow-2xl">
-        {/* Header */}
-        <div className="sticky top-0 z-10 bg-gradient-to-b from-[#F6EDEE] dark:from-[#1A0814] to-transparent backdrop-blur-sm">
-          <div className="flex items-center justify-between p-4">
-            <button onClick={() => setCurrentScreen("mode")} className="p-2 hover:bg-black/5 dark:hover:bg-white/10 rounded-full transition-colors">
-              <ArrowLeft className="w-6 h-6" />
-            </button>
-            <div className="text-sm font-medium opacity-60">Step 1 of 3</div>
-            <div className="w-10" />
-          </div>
+
+      {/* Modern Header */}
+      <header className="relative z-20 flex items-center justify-between px-6 py-6 border-b border-white/5 bg-black/5">
+        <motion.button
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.9 }}
+          onClick={() => setCurrentScreen("mode")}
+          className="w-12 h-12 flex items-center justify-center rounded-2xl bg-white/5 border border-white/10 text-white/50 hover:text-white transition-all shadow-xl"
+        >
+          <ArrowLeft className="w-6 h-6" />
+        </motion.button>
+        <div className="flex flex-col items-center">
+          <span className="text-[9px] font-black tracking-[0.4em] uppercase text-[#D4AF37] mb-1">Identity Builder</span>
+          <span className="text-xs font-bold tracking-widest uppercase text-white/40">Step 03 / 05</span>
+        </div>
+        <div className="w-12" />
+      </header>
+
+      {/* Progress Line */}
+      <div className="relative h-[2px] w-full bg-white/5">
+        <motion.div
+          initial={{ width: "45%" }}
+          animate={{ width: "65%" }}
+          className="absolute top-0 left-0 h-full bg-gradient-to-r from-[#D4AF37] to-[#7A1F3D] shadow-[0_0_10px_#D4AF37]"
+        />
+      </div>
+
+      <div className="flex-1 overflow-y-auto relative z-10 px-8 pt-10 pb-40 space-y-12 no-scrollbar">
+
+        {/* Title Section */}
+        <div className="space-y-3">
+          <h1 className="text-4xl font-black text-white tracking-tighter leading-none">Your Profile</h1>
+          <p className="text-sm text-white/40 font-medium tracking-wide">Show the world who you are.</p>
         </div>
 
-        <div className="px-6 pb-32">
-          {/* Title */}
-          <div className="mb-8 text-center">
-            <h1 className="text-3xl font-serif font-medium mb-2">Create your profile</h1>
-            <p className="opacity-60">Add at least 1 photo to continue</p>
+        {/* Photo Grid - Elite Styling */}
+        <section className="space-y-4">
+          <div className="flex items-center gap-4">
+            <span className="text-[10px] font-black uppercase tracking-[0.3em] text-[#D4AF37]/60">Photos</span>
+            <div className="h-[1px] flex-1 bg-white/5" />
           </div>
-
-          {/* Photo Grid - 6 Slots */}
-          <div className="mb-8">
-            <div className="grid grid-cols-3 gap-3">
-              {/* Main Photo (Larger) */}
-              <div className="col-span-2 row-span-2">
-                <PhotoSlot
-                  photo={photos[0]}
-                  onUpload={() => triggerUpload(0)}
-                  onRemove={() => handleRemovePhoto(0)}
-                  isMain
-                  isUploading={uploadingIndex === 0}
-                />
-              </div>
-
-              {/* Side Photos */}
-              {[1, 2, 3, 4, 5].map((index) => (
-                <PhotoSlot
-                  key={index}
-                  photo={photos[index]}
-                  onUpload={() => triggerUpload(index)}
-                  onRemove={() => handleRemovePhoto(index)}
-                  isUploading={uploadingIndex === index}
-                />
-              ))}
-            </div>
-          </div>
-
-          {/* Basic Info Section */}
-          <Section title="Basic Info">
-            <div className="grid grid-cols-2 gap-4">
-              <Input
-                placeholder="Name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="bg-white/10 border-white/20 text-white placeholder:text-white/50"
-              />
-              <Input
-                placeholder="Age"
-                type="number"
-                value={age}
-                onChange={(e) => setAge(e.target.value)}
-                className="bg-white/10 border-white/20 text-white placeholder:text-white/50"
+          <div className="grid grid-cols-3 gap-3">
+            <div className="col-span-2 row-span-2">
+              <PhotoSlot
+                photo={photos[0]}
+                onUpload={() => triggerUpload(0)}
+                onRemove={() => handleRemovePhoto(0)}
+                isMain
+                isUploading={uploadingIndex === 0}
               />
             </div>
+            {[1, 2, 3, 4, 5].map((index) => (
+              <PhotoSlot
+                key={index}
+                photo={photos[index]}
+                onUpload={() => triggerUpload(index)}
+                onRemove={() => handleRemovePhoto(index)}
+                isUploading={uploadingIndex === index}
+              />
+            ))}
+          </div>
+          <p className="text-[10px] text-white/20 text-center uppercase tracking-widest font-black">Main photo required to continue</p>
+        </section>
 
-            <div className="grid grid-cols-2 gap-4 mt-4">
-              <Select value={gender} onValueChange={setGender}>
-                <SelectTrigger className="bg-white/10 border-white/20 text-white">
-                  <SelectValue placeholder="I am..." />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="0">Man</SelectItem>
-                  <SelectItem value="1">Woman</SelectItem>
-                  <SelectItem value="2">Non-binary</SelectItem>
-                </SelectContent>
-              </Select>
+        {/* Base Identity */}
+        <EliteSection title="The Basics" icon={<User className="w-5 h-5 text-[#D4AF37]" />}>
+          <div className="grid grid-cols-2 gap-4">
+            <EliteInput
+              placeholder="Name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+            <EliteInput
+              placeholder="Age"
+              type="number"
+              value={age}
+              onChange={(e) => setAge(e.target.value)}
+            />
+          </div>
 
-              <Select value={interestedIn} onValueChange={setInterestedIn}>
-                <SelectTrigger className="bg-white/10 border-white/20 text-white">
-                  <SelectValue placeholder="Interested in..." />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="0">Men</SelectItem>
-                  <SelectItem value="1">Women</SelectItem>
-                  <SelectItem value="2">Everyone</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+          <div className="grid grid-cols-2 gap-4 mt-4">
+            <EliteSelect value={gender} onValueChange={setGender} placeholder="Gender" options={[
+              { value: "0", label: "Man" },
+              { value: "1", label: "Woman" },
+              { value: "2", label: "Other" }
+            ]} />
+            <EliteSelect value={interestedIn} onValueChange={setInterestedIn} placeholder="Looking for" options={[
+              { value: "0", label: "Men" },
+              { value: "1", label: "Women" },
+              { value: "2", label: "Everyone" }
+            ]} />
+          </div>
 
-            <Textarea
+          <div className="relative mt-4">
+            <textarea
               placeholder="Tell us about yourself..."
               value={bio}
               onChange={(e) => setBio(e.target.value)}
-              className="mt-4 bg-white/10 border-white/20 text-white placeholder:text-white/50 min-h-[100px]"
+              className="w-full bg-white/[0.03] border border-white/10 rounded-[24px] p-6 text-sm text-white font-medium placeholder:text-white/10 focus:border-[#D4AF37]/30 outline-none transition-all min-h-[120px] resize-none"
               maxLength={500}
             />
-            <div className="text-right text-xs text-white/50 mt-1">{bio.length}/500</div>
-          </Section>
-
-          {/* Location & Height */}
-          <Section title="Location & Physical" icon={<MapPin className="w-5 h-5" />}>
-            <Input
-              placeholder="City, Country"
-              value={location}
-              onChange={(e) => setLocation(e.target.value)}
-              className="bg-white/10 border-white/20 text-white placeholder:text-white/50"
-            />
-
-            <div className="mt-4">
-              <label className="text-sm text-white/70 mb-2 block">Height</label>
-              <div className="grid grid-cols-2 gap-4">
-                <Select value={heightFt} onValueChange={setHeightFt}>
-                  <SelectTrigger className="bg-white/10 border-white/20 text-white">
-                    <SelectValue placeholder="Feet" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {[4, 5, 6, 7].map(ft => (
-                      <SelectItem key={ft} value={ft.toString()}>{ft} ft</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-
-                <Select value={heightIn} onValueChange={setHeightIn}>
-                  <SelectTrigger className="bg-white/10 border-white/20 text-white">
-                    <SelectValue placeholder="Inches" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Array.from({ length: 12 }, (_, i) => (
-                      <SelectItem key={i} value={i.toString()}>{i} in</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+            <div className="absolute bottom-4 right-4 text-[9px] font-black text-white/20 uppercase tracking-widest">
+              {bio.length} / 500
             </div>
-          </Section>
+          </div>
+        </EliteSection>
 
-          {/* Relationship Goals */}
-          <Section title="What are you looking for?" icon={<Heart className="w-5 h-5" />}>
-            <p className="text-sm text-white/60 mb-3">Select up to 3</p>
-            <div className="flex flex-wrap gap-2">
-              {RELATIONSHIP_GOALS.map((goal) => (
-                <button
-                  key={goal.value}
-                  onClick={() => toggleRelationshipGoal(goal.value)}
-                  className={cn(
-                    "px-4 py-2 rounded-full text-sm font-medium transition-all",
-                    relationshipGoals.includes(goal.value)
-                      ? "bg-white text-[#5A2A4A]"
-                      : "bg-white/10 text-white hover:bg-white/20"
-                  )}
-                >
-                  {goal.icon} {goal.label}
-                </button>
-              ))}
+        {/* Social Coordinates */}
+        <EliteSection title="Location" icon={<MapPin className="w-5 h-5 text-[#D4AF37]" />}>
+          <EliteInput
+            placeholder="City, Country"
+            value={location}
+            onChange={(e) => setLocation(e.target.value)}
+          />
+          <div className="mt-6 space-y-3">
+            <label className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em] ml-2">Height</label>
+            <div className="grid grid-cols-2 gap-4">
+              <EliteSelect value={heightFt} onValueChange={setHeightFt} placeholder="Feet" options={[4, 5, 6, 7].map(ft => ({ value: ft.toString(), label: `${ft} ft` }))} />
+              <EliteSelect value={heightIn} onValueChange={setHeightIn} placeholder="Inches" options={Array.from({ length: 12 }, (_, i) => ({ value: i.toString(), label: `${i} in` }))} />
             </div>
-          </Section>
+          </div>
+        </EliteSection>
 
-          {/* Lifestyle */}
-          <Section title="Lifestyle" icon={<Wine className="w-5 h-5" />}>
-            <div className="space-y-4">
-              <div>
-                <label className="text-sm text-white/70 mb-2 block flex items-center gap-2">
-                  <Wine className="w-4 h-4" /> Drinking
-                </label>
-                <Select value={drinking} onValueChange={setDrinking}>
-                  <SelectTrigger className="bg-white/10 border-white/20 text-white">
-                    <SelectValue placeholder="Select..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="never">Never</SelectItem>
-                    <SelectItem value="socially">Socially</SelectItem>
-                    <SelectItem value="regularly">Regularly</SelectItem>
-                    <SelectItem value="prefer-not-say">Prefer not to say</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+        {/* Relationship Choice */}
+        <EliteSection title="Relationship Goals" icon={<Heart className="w-5 h-5 text-[#D4AF37]" />}>
+          <div className="flex flex-wrap gap-2">
+            {RELATIONSHIP_GOALS.map((goal) => (
+              <motion.button
+                key={goal.value}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => toggleRelationshipGoal(goal.value)}
+                className={cn(
+                  "px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all border",
+                  relationshipGoals.includes(goal.value)
+                    ? "bg-[#D4AF37] text-[#1A0814] border-[#D4AF37] shadow-[0_0_15px_rgba(212,175,55,0.3)]"
+                    : "bg-white/5 text-white/40 border-white/10 hover:border-white/20"
+                )}
+              >
+                {goal.label}
+              </motion.button>
+            ))}
+          </div>
+        </EliteSection>
 
-              <div>
-                <label className="text-sm text-white/70 mb-2 block flex items-center gap-2">
-                  <Cigarette className="w-4 h-4" /> Smoking
-                </label>
-                <Select value={smoking} onValueChange={setSmoking}>
-                  <SelectTrigger className="bg-white/10 border-white/20 text-white">
-                    <SelectValue placeholder="Select..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="never">Never</SelectItem>
-                    <SelectItem value="socially">Socially</SelectItem>
-                    <SelectItem value="regularly">Regularly</SelectItem>
-                    <SelectItem value="trying-quit">Trying to quit</SelectItem>
-                    <SelectItem value="prefer-not-say">Prefer not to say</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+        {/* Lifestyle Logic */}
+        <EliteSection title="Lifestyle" icon={<Activity className="w-5 h-5 text-[#D4AF37]" />}>
+          <div className="space-y-6">
+            <EliteSelectField label="Drinking" icon={<Wine className="w-4 h-4" />} value={drinking} onValueChange={setDrinking} options={[
+              { value: "never", label: "Never" },
+              { value: "socially", label: "Socially" },
+              { value: "regularly", label: "Regularly" },
+              { value: "prefer-not-say", label: "Prefer not to say" }
+            ]} />
+            <EliteSelectField label="Smoking" icon={<Cigarette className="w-4 h-4" />} value={smoking} onValueChange={setSmoking} options={[
+              { value: "never", label: "Never" },
+              { value: "socially", label: "Socially" },
+              { value: "regularly", label: "Regularly" },
+              { value: "trying-quit", label: "Trying to quit" }
+            ]} />
+            <EliteSelectField label="Exercise" icon={<Dumbbell className="w-4 h-4" />} value={exercise} onValueChange={setExercise} options={[
+              { value: "active", label: "Active" },
+              { value: "sometimes", label: "Sometimes" },
+              { value: "rarely", label: "Rarely" }
+            ]} />
+            <EliteSelectField label="Diet" icon={<UtensilsCrossed className="w-4 h-4" />} value={diet} onValueChange={setDiet} options={[
+              { value: "omnivore", label: "Omnivore" },
+              { value: "vegetarian", label: "Vegetarian" },
+              { value: "vegan", label: "Vegan" },
+              { value: "pescatarian", label: "Pescatarian" }
+            ]} />
+          </div>
+        </EliteSection>
 
-              <div>
-                <label className="text-sm text-white/70 mb-2 block flex items-center gap-2">
-                  <Dumbbell className="w-4 h-4" /> Exercise
-                </label>
-                <Select value={exercise} onValueChange={setExercise}>
-                  <SelectTrigger className="bg-white/10 border-white/20 text-white">
-                    <SelectValue placeholder="Select..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="active">Active (4+ times/week)</SelectItem>
-                    <SelectItem value="sometimes">Sometimes (1-3 times/week)</SelectItem>
-                    <SelectItem value="rarely">Rarely</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+        {/* Industrial Focus */}
+        <EliteSection title="Job & School" icon={<Briefcase className="w-5 h-5 text-[#D4AF37]" />}>
+          <div className="grid grid-cols-1 gap-4">
+            <EliteInput placeholder="Job Title" value={job} onChange={(e) => setJob(e.target.value)} />
+            <EliteInput placeholder="School" value={school} onChange={(e) => setSchool(e.target.value)} />
+          </div>
+        </EliteSection>
 
-              <div>
-                <label className="text-sm text-white/70 mb-2 block flex items-center gap-2">
-                  <UtensilsCrossed className="w-4 h-4" /> Diet
-                </label>
-                <Select value={diet} onValueChange={setDiet}>
-                  <SelectTrigger className="bg-white/10 border-white/20 text-white">
-                    <SelectValue placeholder="Select..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="omnivore">Omnivore</SelectItem>
-                    <SelectItem value="vegetarian">Vegetarian</SelectItem>
-                    <SelectItem value="vegan">Vegan</SelectItem>
-                    <SelectItem value="pescatarian">Pescatarian</SelectItem>
-                    <SelectItem value="kosher">Kosher</SelectItem>
-                    <SelectItem value="halal">Halal</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+        {/* Interest Selection */}
+        <EliteSection title="Interests" icon={<Layers className="w-5 h-5 text-[#D4AF37]" />}>
+          <div className="flex flex-wrap gap-2">
+            {ALL_INTERESTS.map((interest) => (
+              <motion.button
+                key={interest}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => toggleInterest(interest)}
+                className={cn(
+                  "px-3 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all border",
+                  selectedInterests.includes(interest)
+                    ? "bg-[#D4AF37]/20 text-[#D4AF37] border-[#D4AF37]/50 shadow-[0_0_10px_rgba(212,175,55,0.1)]"
+                    : "bg-white/5 text-white/30 border-white/5 hover:border-white/10"
+                )}
+              >
+                {interest}
+              </motion.button>
+            ))}
+          </div>
+        </EliteSection>
 
-              <div>
-                <label className="text-sm text-white/70 mb-2 block flex items-center gap-2">
-                  <Dog className="w-4 h-4" /> Pets
-                </label>
-                <Select value={pets} onValueChange={setPets}>
-                  <SelectTrigger className="bg-white/10 border-white/20 text-white">
-                    <SelectValue placeholder="Select..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="dog">Dog person</SelectItem>
-                    <SelectItem value="cat">Cat person</SelectItem>
-                    <SelectItem value="both">Both</SelectItem>
-                    <SelectItem value="neither">Neither</SelectItem>
-                    <SelectItem value="have-pets">Have pets</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </Section>
+      </div>
 
-          {/* Work & Education */}
-          <Section title="Work & Education">
-            <Input
-              placeholder="Job Title"
-              value={job}
-              onChange={(e) => setJob(e.target.value)}
-              className="bg-white/10 border-white/20 text-white placeholder:text-white/50"
-            />
-            <Input
-              placeholder="School"
-              value={school}
-              onChange={(e) => setSchool(e.target.value)}
-              className="mt-4 bg-white/10 border-white/20 text-white placeholder:text-white/50"
-            />
-          </Section>
-
-          {/* Interests */}
-          <Section title="Interests" icon={<Heart className="w-5 h-5" />}>
-            <p className="text-sm text-white/60 mb-3">Select up to 10 interests</p>
-            <div className="flex flex-wrap gap-2">
-              {ALL_INTERESTS.map((interest) => (
-                <button
-                  key={interest}
-                  onClick={() => toggleInterest(interest)}
-                  className={cn(
-                    "px-3 py-1.5 rounded-full text-sm transition-all",
-                    selectedInterests.includes(interest)
-                      ? "bg-white text-[#5A2A4A] font-medium"
-                      : "bg-white/10 text-white hover:bg-white/20"
-                  )}
-                >
-                  {interest}
-                </button>
-              ))}
-            </div>
-            <div className="text-right text-xs text-white/50 mt-2">
-              {selectedInterests.length}/10 selected
-            </div>
-          </Section>
-        </div>
-
-        {/* Bottom Button */}
-        <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-[#5A2A4A] via-[#5A2A4A]/95 to-transparent z-40">
-          <Button
+      {/* Futuristic Fixed Footer CTA */}
+      <motion.div
+        layout
+        className="fixed bottom-0 left-0 right-0 p-8 pb-10 bg-gradient-to-t from-[#1A0814] via-[#1A0814]/90 to-transparent z-30"
+      >
+        <div className="max-w-md mx-auto relative group">
+          <div className="absolute -inset-1 bg-gradient-to-r from-[#D4AF37] to-[#7A1F3D] rounded-[24px] blur-xl opacity-20 group-hover:opacity-40 transition-opacity" />
+          <motion.button
+            whileHover={{ scale: 1.02, y: -2 }}
+            whileTap={{ scale: 0.98 }}
             onClick={handleContinue}
             disabled={!isValid}
-            className="w-full h-14 bg-white text-[#5A2A4A] hover:bg-white/90 font-semibold text-base rounded-2xl disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-xl"
+            className="w-full h-18 rounded-[22px] bg-white text-[#1A0814] font-black uppercase tracking-[0.3em] text-sm shadow-[0_20px_50px_rgba(255,255,255,0.1)] flex items-center justify-center gap-4 relative overflow-hidden disabled:opacity-30"
           >
-            Continue
-          </Button>
+            <Zap className="w-5 h-5 fill-current" />
+            Complete Profile
+            <motion.div
+              className="absolute inset-0 bg-gradient-to-r from-transparent via-[#D4AF37]/30 to-transparent skew-x-[30deg]"
+              animate={{ x: ['-200%', '200%'] }}
+              transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+            />
+          </motion.button>
         </div>
-      </div>
+      </motion.div>
     </div>
   )
 }
 
-function Section({ title, icon, children }: { title: string; icon?: React.ReactNode; children: React.ReactNode }) {
+function EliteSection({ title, icon, children }: { title: string; icon: React.ReactNode; children: React.ReactNode }) {
   return (
-    <div className="mb-8">
-      <h2 className="text-xl font-serif font-medium mb-4 flex items-center gap-2">
-        {icon}
-        {title}
-      </h2>
-      {children}
+    <section className="space-y-6">
+      <div className="flex items-center gap-4">
+        <div className="w-10 h-10 rounded-xl bg-[#D4AF37]/10 flex items-center justify-center border border-[#D4AF37]/20">
+          {icon}
+        </div>
+        <h2 className="text-xl font-black text-white tracking-tighter uppercase">{title}</h2>
+        <div className="h-[1px] flex-1 bg-white/5" />
+      </div>
+      <div className="px-2">
+        {children}
+      </div>
+    </section>
+  )
+}
+
+function EliteInput({ ...props }: React.InputHTMLAttributes<HTMLInputElement>) {
+  return (
+    <input
+      {...props}
+      className={cn(
+        "w-full h-14 bg-white/[0.03] border border-white/10 rounded-[20px] px-6 text-sm text-white font-bold placeholder:text-white/10 focus:border-[#D4AF37]/30 outline-none transition-all",
+        props.className
+      )}
+    />
+  )
+}
+
+function EliteSelect({ value, onValueChange, placeholder, options }: { value: string; onValueChange: (v: string) => void; placeholder: string; options: { value: string; label: string }[] }) {
+  return (
+    <Select value={value} onValueChange={onValueChange}>
+      <SelectTrigger className="h-14 bg-white/[0.03] border-white/10 rounded-[20px] text-white/40 focus:ring-0 focus:border-[#D4AF37]/30">
+        <SelectValue placeholder={placeholder} />
+      </SelectTrigger>
+      <SelectContent className="bg-[#1A0814] border-white/10 text-white">
+        {options.map(opt => (
+          <SelectItem key={opt.value} value={opt.value} className="focus:bg-[#D4AF37] focus:text-[#1A0814]">{opt.label}</SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  )
+}
+
+function EliteSelectField({ label, icon, value, onValueChange, options }: { label: string; icon: React.ReactNode; value: string; onValueChange: (v: string) => void; options: any[] }) {
+  return (
+    <div className="space-y-3">
+      <label className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em] ml-2 flex items-center gap-2">
+        {icon} {label}
+      </label>
+      <EliteSelect value={value} onValueChange={onValueChange} placeholder="Select Protocol..." options={options} />
     </div>
   )
 }
@@ -501,22 +486,26 @@ function PhotoSlot({
   return (
     <div
       className={cn(
-        "relative rounded-2xl overflow-hidden bg-white/5 border-2 border-dashed border-white/20 hover:border-white/40 transition-all group",
+        "relative rounded-[28px] overflow-hidden bg-white/[0.02] border-2 border-dashed transition-all group perspective-1000",
+        photo ? "border-white/10 shadow-xl" : "border-white/5 hover:border-[#D4AF37]/30",
         isMain ? "aspect-[3/4]" : "aspect-square"
       )}
     >
       {photo ? (
         <>
-          <img src={photo} alt="Profile" className="w-full h-full object-cover" />
-          <button
+          <img src={photo} alt="Profile" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+          <motion.button
+            whileHover={{ scale: 1.1, rotate: 90 }}
+            whileTap={{ scale: 0.9 }}
             onClick={onRemove}
-            className="absolute top-2 right-2 w-8 h-8 bg-black/60 backdrop-blur-sm rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+            className="absolute top-4 right-4 w-10 h-10 bg-black/60 backdrop-blur-md rounded-full flex items-center justify-center text-white/40 hover:text-white transition-all shadow-2xl"
           >
-            <X className="w-4 h-4 text-white" />
-          </button>
+            <X className="w-5 h-5" />
+          </motion.button>
           {isMain && (
-            <div className="absolute bottom-2 left-2 px-2 py-1 bg-black/60 backdrop-blur-sm rounded-full text-xs font-medium">
-              Main Photo
+            <div className="absolute bottom-4 left-4 px-3 py-1 bg-[#D4AF37] text-[#1A0814] rounded-full text-[8px] font-black uppercase tracking-[0.2em] shadow-2xl">
+              Primary Logic
             </div>
           )}
         </>
@@ -524,16 +513,16 @@ function PhotoSlot({
         <button
           onClick={onUpload}
           disabled={isUploading}
-          className="w-full h-full flex flex-col items-center justify-center gap-2 hover:bg-white/10 transition-colors disabled:opacity-50"
+          className="w-full h-full flex flex-col items-center justify-center gap-4 hover:bg-white/[0.02] transition-all disabled:opacity-50"
         >
           {isUploading ? (
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
+            <div className="w-10 h-10 border-4 border-[#D4AF37] border-t-transparent rounded-full animate-spin"></div>
           ) : (
-            <div className="w-12 h-12 rounded-full bg-white/10 flex items-center justify-center">
-              <Plus className="w-6 h-6" />
+            <div className="w-14 h-14 rounded-2xl bg-white/5 flex items-center justify-center group-hover:bg-[#D4AF37]/10 transition-colors">
+              <Plus className="w-7 h-7 text-white/20 group-hover:text-[#D4AF37]" />
             </div>
           )}
-          {isMain && <span className="text-sm font-medium">{isUploading ? "Uploading..." : "Add Main Photo"}</span>}
+          {isMain && <span className="text-[10px] font-black text-white/20 uppercase tracking-[0.2em]">{isUploading ? "Uploading Protocol..." : "Add Primary Asset"}</span>}
         </button>
       )}
     </div>

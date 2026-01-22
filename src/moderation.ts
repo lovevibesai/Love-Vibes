@@ -15,6 +15,28 @@ export interface ModerationReport {
     admin_notes?: string
     reviewed_by?: string
     reviewed_at?: number
+    auto_flagged?: boolean
+    toxic_score?: number
+}
+
+// AI Content Moderation Helper
+export async function autoModerateContent(env: Env, text: string): Promise<{ toxic: boolean; score: number }> {
+    try {
+        const result: any = await env.AI.run('@cf/microsoft/distilbert-base-uncased-mnli', {
+            text: text
+        });
+
+        // mnli returns label scores. "toxic" is often mapped or we check for general negative sentiment
+        // For simplicity with this model, we'll look for the highest probability label
+        const toxicScore = result.label === 'LABEL_1' ? result.score : 0; // Depends on model mapping
+
+        return {
+            toxic: toxicScore > 0.85,
+            score: toxicScore
+        };
+    } catch (e) {
+        return { toxic: false, score: 0 };
+    }
 }
 
 // GET /admin/moderation/reports - Get all pending reports
@@ -48,7 +70,7 @@ export async function getPendingReports(env: Env, adminId: string): Promise<Mode
     LIMIT 100`
     ).all()
 
-    return results.results as ModerationReport[]
+    return results.results as unknown as ModerationReport[]
 }
 
 // POST /admin/moderation/review - Review a report

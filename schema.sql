@@ -158,3 +158,36 @@ CREATE TABLE UserPreferences (
     updated_at INTEGER,
     FOREIGN KEY(user_id) REFERENCES Users(id)
 );
+
+-- 7. Authentication Challenges (Internal)
+CREATE TABLE AuthChallenges (
+    id TEXT PRIMARY KEY,
+    challenge TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    type TEXT NOT NULL, -- 'registration' or 'login'
+    expires_at INTEGER NOT NULL
+);
+
+-- 8. WebAuthn User Credentials
+CREATE TABLE UserCredentials (
+    id TEXT PRIMARY KEY, -- credentialID (base64)
+    user_id TEXT NOT NULL,
+    public_key TEXT NOT NULL, -- (base64)
+    counter INTEGER DEFAULT 0,
+    created_at INTEGER,
+    FOREIGN KEY(user_id) REFERENCES Users(id)
+);
+
+-- 9. Financial Transactions
+CREATE TABLE Transactions (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    type TEXT NOT NULL, -- 'credit_purchase', 'subscription', 'gift'
+    amount REAL DEFAULT 0,
+    credits_granted INTEGER DEFAULT 0,
+    status TEXT DEFAULT 'PENDING', -- 'PENDING', 'COMPLETED', 'FAILED'
+    timestamp INTEGER NOT NULL,
+    FOREIGN KEY(user_id) REFERENCES Users(id)
+);
+
+CREATE INDEX idx_transactions_user ON Transactions(user_id);

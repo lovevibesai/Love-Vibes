@@ -49,7 +49,7 @@ export function PromptSelection({ prompts, onComplete }: PromptSelectionProps) {
         onComplete(promptResponses)
     }
 
-    const canComplete = selectedPrompts.every(id => responses[id]?.trim().length >= 10)
+    const canComplete = selectedPrompts.length === 3 && selectedPrompts.every(id => (responses[id]?.trim()?.length || 0) >= 3)
 
     if (currentStep === 'select') {
         return (

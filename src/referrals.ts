@@ -1,5 +1,5 @@
 // Referral Tracking System
-// Track referrals and reward users
+// Track referrals and reward users with Scenario Keys
 
 import { Env } from './index'
 
@@ -7,7 +7,7 @@ export interface ReferralStats {
     referral_code: string
     total_referrals: number
     successful_signups: number
-    credits_earned: number
+    available_keys: number
     referrals: Array<{
         name: string
         joined_at: number
@@ -44,7 +44,7 @@ export async function trackReferral(
 ): Promise<{ success: boolean; reward?: number }> {
     try {
         // Find referrer
-        const referrer = await env.DB.prepare('SELECT id, credits_balance FROM Users WHERE referral_code = ?')
+        const referrer = await env.DB.prepare('SELECT id, scenario_keys FROM Users WHERE referral_code = ?')
             .bind(referralCode)
             .first()
 
@@ -61,13 +61,13 @@ export async function trackReferral(
             .bind(referrer.id, newUserId, 'signed_up', now)
             .run()
 
-        // Reward referrer with credits
-        const rewardCredits = 50
-        await env.DB.prepare('UPDATE Users SET credits_balance = credits_balance + ? WHERE id = ?')
-            .bind(rewardCredits, referrer.id)
+        // Reward referrer with 3 Scenario Keys
+        const keysReward = 3
+        await env.DB.prepare('UPDATE Users SET scenario_keys = scenario_keys + ? WHERE id = ?')
+            .bind(keysReward, referrer.id)
             .run()
 
-        return { success: true, reward: rewardCredits }
+        return { success: true, reward: keysReward }
     } catch (error) {
         console.error('Referral tracking failed:', error)
         return { success: false }
@@ -76,18 +76,22 @@ export async function trackReferral(
 
 // Get referral stats for user
 export async function getReferralStats(env: Env, userId: string): Promise<ReferralStats> {
-    // Get user's referral code
-    const user = await env.DB.prepare('SELECT referral_code FROM Users WHERE id = ?')
+    // Get user's referral code and keys
+    const user = await env.DB.prepare('SELECT referral_code, scenario_keys FROM Users WHERE id = ?')
         .bind(userId)
         .first()
 
-    if (!user || !user.referral_code) {
+    if (!user) {
+        throw new Error("User not found")
+    }
+
+    if (!user.referral_code) {
         const code = await generateReferralCode(env, userId)
         return {
             referral_code: code,
             total_referrals: 0,
             successful_signups: 0,
-            credits_earned: 0,
+            available_keys: 0,
             referrals: [],
         }
     }
@@ -119,11 +123,34 @@ export async function getReferralStats(env: Env, userId: string): Promise<Referr
         referral_code: user.referral_code as string,
         total_referrals: (stats?.total as number) || 0,
         successful_signups: (stats?.successful as number) || 0,
-        credits_earned: ((stats?.successful as number) || 0) * 50,
+        available_keys: (user.scenario_keys as number) || 0,
         referrals: referrals.results.map((r: any) => ({
             name: r.name,
             joined_at: r.created_at,
             status: r.status,
         })),
+    }
+}
+
+// Unlock a scenario (spend a key)
+export async function unlockScenario(env: Env, userId: string, scenarioType: 'intimate' | 'mystical'): Promise<{ success: boolean, keysRemaining: number }> {
+    const user = await env.DB.prepare('SELECT scenario_keys FROM Users WHERE id = ?')
+        .bind(userId)
+        .first()
+
+    if (!user || (user.scenario_keys as number) < 1) {
+        throw new Error("Insufficient Scenario Keys")
+    }
+
+    // Deduct key
+    await env.DB.prepare('UPDATE Users SET scenario_keys = scenario_keys - 1 WHERE id = ?')
+        .bind(userId)
+        .run()
+
+    // In a real implementation, we would create a "ScenarioSession" record here
+
+    return {
+        success: true,
+        keysRemaining: (user.scenario_keys as number) - 1
     }
 }

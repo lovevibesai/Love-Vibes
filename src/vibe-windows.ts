@@ -87,13 +87,13 @@ export async function getVibeWindowStatus(env: Env, userId: string): Promise<Act
 
         return {
             is_in_window: true,
-            current_window: currentWindow as VibeWindow,
+            current_window: currentWindow as unknown as VibeWindow,
             users_online_now: onlineCount,
         }
     }
 
     // Find next window
-    const nextWindow = findNextWindow(windows.results as VibeWindow[], currentDay, currentHour, currentMinute)
+    const nextWindow = findNextWindow(windows.results as unknown as VibeWindow[], currentDay, currentHour, currentMinute)
 
     return {
         is_in_window: false,

@@ -2,7 +2,7 @@ import { Env } from './index';
 import { verifyAuth } from './auth';
 
 export async function handleReportUser(request: Request, env: Env): Promise<Response> {
-    const userId = await verifyAuth(request);
+    const userId = await verifyAuth(request, env);
     if (!userId) return new Response("Unauthorized", { status: 401 });
 
     try {
@@ -35,7 +35,7 @@ export async function handleReportUser(request: Request, env: Env): Promise<Resp
 }
 
 export async function handleBlockUser(request: Request, env: Env): Promise<Response> {
-    const userId = await verifyAuth(request);
+    const userId = await verifyAuth(request, env);
     if (!userId) return new Response("Unauthorized", { status: 401 });
 
     try {

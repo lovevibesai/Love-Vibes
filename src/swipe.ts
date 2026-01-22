@@ -6,7 +6,7 @@ import { Env } from './index';
 import { verifyAuth } from './auth';
 
 export async function handleSwipe(request: Request, env: Env): Promise<Response> {
-    const userId = await verifyAuth(request); // Actor
+    const userId = await verifyAuth(request, env); // Actor
     if (!userId) return new Response("Unauthorized", { status: 401 });
 
     const url = new URL(request.url);

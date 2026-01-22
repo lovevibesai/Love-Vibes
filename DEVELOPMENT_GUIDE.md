@@ -68,6 +68,13 @@ Report any security vulnerabilities or critical system failures immediately to t
 ### Production Access
 Production credentials and keys are managed via Cloudflare Secrets. Only authorized leads have write access to production secrets.
 
+## Owner Directory Protocol
+
+The `LOVE VIBES OWNER` directory is a protected area containing proprietary blueprints, branding assets, and financial reports. 
+- **NO MOVING**: Never move the folder or its contents.
+- **READ-ONLY PREFERENCE**: If content from this directory is needed for AI tasks, it must be **copied** (not moved) to a working directory.
+- **OWNER-ONLY PRIVACY**: This folder is dedicated to the project owner for manual storage and reference.
+
 ---
 
 **Confidential & Proprietary © Love Vibes AI**

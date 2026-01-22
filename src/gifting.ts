@@ -6,7 +6,7 @@ import { Env } from './index';
 import { verifyAuth } from './auth';
 
 export async function handleGifting(request: Request, env: Env): Promise<Response> {
-    const userId = await verifyAuth(request);
+    const userId = await verifyAuth(request, env);
     if (!userId) return new Response("Unauthorized", { status: 401 });
 
     const body: any = await request.json();

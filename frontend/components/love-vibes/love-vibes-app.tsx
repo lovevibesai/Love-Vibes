@@ -30,12 +30,19 @@ import { ReferralDashboardScreen } from "./referrals/referral-dashboard-screen"
 import { ChemistryTestScreen } from "./chemistry/chemistry-test-screen"
 import { MutualFriendsScreen } from "./social/mutual-friends-screen"
 import { BoostScreen } from "./boost/boost-screen"
+import { InnovativeFeaturesScreen } from "./settings/innovative-features-screen"
+import { IdentitySignatureScreen } from "./viral/identity-signature-screen"
+
 
 export function LoveVibesApp() {
   const { currentScreen, isOnboarded } = useApp()
-  const [showSplash, setShowSplash] = useState(true)
+  const [showSplash, setShowSplash] = useState(() => {
+    // FORCE DISABLE SPLASH to resolve stuck state
+    return false;
+  })
 
   // Show splash on first render
+
   if (showSplash) {
     return <LoveVibesSplash onComplete={() => setShowSplash(false)} />
   }
@@ -83,6 +90,10 @@ export function LoveVibesApp() {
         {currentScreen === "chemistry-test" && <ChemistryTestScreen />}
         {currentScreen === "mutual-friends" && <MutualFriendsScreen />}
         {currentScreen === "boost" && <BoostScreen />}
+        {currentScreen === "innovative-features" && <InnovativeFeaturesScreen />}
+        {currentScreen === "identity-signature" && <IdentitySignatureScreen />}
+        {/* Redirect legacy social-endorsements to new dashboard */}
+        {currentScreen === "social-endorsements" && <ReferralDashboardScreen />}
       </main>
       {showBottomNav && <BottomNav />}
       <DevToolbar />

@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { useApp } from "@/lib/app-context"
 import { Button } from "@/components/ui/button"
-import { Phone, Mail, Moon, Sun } from "lucide-react"
+import { Phone, Mail, Moon, Sun, ShieldCheck } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { useTheme } from "next-themes"
 
@@ -35,12 +35,13 @@ function generateParticles(count: number): Particle[] {
 
 export function WelcomeScreen() {
   const { setCurrentScreen } = useApp()
-  const [particles] = useState(() => generateParticles(60))
+  const [particles, setParticles] = useState<Particle[]>([])
   const { theme, setTheme, resolvedTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
     setMounted(true)
+    setParticles(generateParticles(60))
   }, [])
 
   const toggleTheme = () => {
@@ -88,7 +89,7 @@ export function WelcomeScreen() {
         <motion.div
           className="absolute inset-0"
           style={{
-            background: "radial-gradient(circle at 50% 40%, rgba(232, 134, 124, 0.15) 0%, transparent 50%)",
+            background: "radial-gradient(circle at 50% 40%, rgba(212, 175, 55, 0.15) 0%, transparent 50%)",
           }}
           animate={{
             opacity: [0.2, 0.4, 0.2],
@@ -115,12 +116,12 @@ export function WelcomeScreen() {
                 backgroundColor: particle.type === "orb"
                   ? "#F6EDEE"
                   : particle.type === "spark"
-                    ? "#F07A6A"
+                    ? "#D4AF37"
                     : "#C84A4A",
                 boxShadow: particle.type === "orb"
                   ? `0 0 ${particle.size * 4}px rgba(246, 237, 238, 0.8)`
                   : particle.type === "spark"
-                    ? `0 0 ${particle.size * 3}px rgba(240, 122, 106, 0.6)`
+                    ? `0 0 ${particle.size * 3}px rgba(228, 195, 138, 0.6)`
                     : `0 0 ${particle.size * 2}px rgba(200, 74, 74, 0.4)`,
               }}
               initial={{ y: 0, x: 0, opacity: 0 }}
@@ -195,14 +196,14 @@ export function WelcomeScreen() {
               <div
                 className="absolute inset-0 blur-[80px] opacity-70"
                 style={{
-                  background: "radial-gradient(circle, rgba(232, 134, 124, 0.6) 0%, rgba(139, 58, 58, 0.4) 40%, transparent 70%)",
+                  background: "radial-gradient(circle, rgba(212, 175, 55, 0.4) 0%, rgba(139, 58, 58, 0.3) 40%, transparent 70%)",
                   transform: "scale(2)",
                 }}
               />
               <div
                 className="absolute inset-0 blur-[50px] opacity-50"
                 style={{
-                  background: "radial-gradient(circle, rgba(199, 91, 92, 0.5) 0%, transparent 60%)",
+                  background: "radial-gradient(circle, rgba(139, 58, 58, 0.5) 0%, transparent 60%)",
                   transform: "scale(1.8)",
                 }}
               />
@@ -213,7 +214,7 @@ export function WelcomeScreen() {
                 alt="Love Vibes"
                 className="w-64 h-64 mx-auto object-contain relative"
                 style={{
-                  filter: "drop-shadow(0 0 40px rgba(232, 134, 124, 0.8))",
+                  filter: "drop-shadow(0 0 40px rgba(212, 175, 55, 0.6))",
                 }}
               />
             </div>
@@ -225,7 +226,7 @@ export function WelcomeScreen() {
             transition={{ duration: 1.2, delay: 0.8 }}
             className="text-lg text-[#F6EDEE]/90 mb-12 max-w-md font-serif italic tracking-wide"
           >
-            Meaningful connections, your way
+            Elite connections. Simple vibes.
           </motion.p>
 
           <motion.div
@@ -234,7 +235,7 @@ export function WelcomeScreen() {
             transition={{ duration: 0.6, delay: 1.0 }}
             className="w-full max-w-sm space-y-4"
           >
-            {/* Primary CTA - Phone */}
+            {/* Primary CTA - Passkey */}
             <button
               onClick={() => setCurrentScreen("phone")}
               className="w-full h-16 text-base font-semibold rounded-[20px] relative overflow-hidden group border-0 transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] text-white"
@@ -246,17 +247,15 @@ export function WelcomeScreen() {
               {/* Shine overlay */}
               <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-1000" />
 
-              {/* Inner glow */}
-              <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-                style={{
-                  background: "radial-gradient(circle at center, rgba(255, 255, 255, 0.15) 0%, transparent 70%)",
-                }}
-              />
+              {/* Secure Badge */}
+              <div className="absolute top-0 right-0 p-2">
+                <span className="bg-white/20 backdrop-blur-md px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-[0.1em]">ULTRA-SECURE</span>
+              </div>
 
               {/* Content */}
               <div className="relative flex items-center justify-center gap-2">
-                <Phone className="w-5 h-5" />
-                <span className="font-semibold tracking-wide">Continue with Phone</span>
+                <ShieldCheck className="w-5 h-5" />
+                <span className="font-semibold tracking-wide">Secure Login</span>
               </div>
             </button>
 
@@ -265,10 +264,10 @@ export function WelcomeScreen() {
               onClick={() => setCurrentScreen("phone")}
               className="w-full h-16 text-base font-medium rounded-[20px] relative overflow-hidden group transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]"
               style={{
-                background: "linear-gradient(135deg, rgba(139, 58, 58, 0.15) 0%, rgba(199, 91, 92, 0.1) 100%)",
+                background: "linear-gradient(135deg, rgba(212, 175, 55, 0.15) 0%, rgba(212, 175, 55, 0.05) 100%)",
                 border: "2px solid transparent",
                 backgroundClip: "padding-box",
-                boxShadow: "0 8px 24px rgba(232, 134, 124, 0.15), 0 2px 8px rgba(0, 0, 0, 0.2), inset 0 0 0 2px rgba(232, 134, 124, 0.3)",
+                boxShadow: "0 8px 24px rgba(212, 175, 55, 0.15), 0 2px 8px rgba(0, 0, 0, 0.2), inset 0 0 0 2px rgba(212, 175, 55, 0.3)",
                 color: "#F8E5D8",
                 backdropFilter: "blur(10px)",
               }}
@@ -276,17 +275,19 @@ export function WelcomeScreen() {
               {/* Hover glow */}
               <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
                 style={{
-                  background: "radial-gradient(circle at center, rgba(232, 134, 124, 0.2) 0%, transparent 70%)",
+                  background: "radial-gradient(circle at center, rgba(212, 175, 55, 0.2) 0%, transparent 70%)",
                 }}
               />
 
-              {/* Shine effect */}
-              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-1000" />
+              {/* Secure Badge */}
+              <div className="absolute top-0 right-0 p-2">
+                <span className="bg-white/20 backdrop-blur-md px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-[0.1em]">ULTRA-SECURE</span>
+              </div>
 
               {/* Content */}
               <div className="relative flex items-center justify-center gap-2">
                 <Mail className="w-5 h-5" />
-                <span className="font-semibold tracking-wide">Continue with Email</span>
+                <span className="font-semibold tracking-wide">Email Login</span>
               </div>
             </button>
           </motion.div>

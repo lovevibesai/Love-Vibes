@@ -9,8 +9,11 @@ import {
   Gift,
   Sparkles,
   Crown,
-  Check
+  Check,
+  Shield,
+  Zap
 } from "lucide-react"
+import { motion, AnimatePresence } from "framer-motion"
 import { PremiumModal } from "@/components/love-vibes/premium-modal"
 
 interface CreditPackage {
@@ -51,141 +54,245 @@ export function CreditsStore() {
   }
 
   return (
-    <div className="h-full flex flex-col bg-background">
-      {/* Header */}
-      <header className="flex items-center gap-3 px-4 py-3 border-b border-border bg-card">
-        <button
+    <div className="h-full flex flex-col bg-[#1A0814] overflow-hidden relative font-sans">
+      {/* Deep Space Background with Organic Mesh */}
+      <div className="absolute inset-0 pointer-events-none">
+        <motion.div
+          animate={{
+            scale: [1, 1.2, 1],
+            opacity: [0.2, 0.4, 0.2]
+          }}
+          transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
+          className="absolute top-[-20%] right-[-10%] w-[100%] h-[70%] rounded-full blur-[150px]"
+          style={{ background: 'radial-gradient(circle, #7A1F3D, transparent)' }}
+        />
+        <div className="absolute bottom-[-10%] left-[-20%] w-[90%] h-[60%] rounded-full blur-[130px]" style={{ background: 'radial-gradient(circle, #2A0D1F, transparent)' }} />
+      </div>
+
+      {/* Ultra-Modern Header */}
+      <header className="relative z-20 flex items-center justify-between px-8 py-6 backdrop-blur-xl bg-black/20 border-b border-white/5">
+        <motion.button
+          whileHover={{ scale: 1.1, rotate: -5 }}
+          whileTap={{ scale: 0.9 }}
           onClick={() => setCurrentScreen("profile")}
-          className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-muted transition-colors"
-          aria-label="Go back"
+          className="w-12 h-12 flex items-center justify-center rounded-2xl bg-white/5 border border-white/10 text-white/70 hover:text-white transition-all shadow-[0_0_20px_rgba(255,255,255,0.05)]"
         >
-          <ChevronLeft className="w-6 h-6 text-foreground" />
-        </button>
-        <h1 className="text-lg font-semibold text-foreground">Get Credits</h1>
+          <ChevronLeft className="w-7 h-7" />
+        </motion.button>
+        <div className="flex flex-col items-center">
+          <span className="text-[10px] font-black tracking-[0.4em] uppercase text-[#D4AF37] mb-1">Vault</span>
+          <span className="text-sm font-bold tracking-widest uppercase text-white/90">Elite Credits</span>
+        </div>
+        <div className="w-12" />
       </header>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto">
-        {/* Premium Upsell */}
-        <section className="p-4 bg-gradient-to-r from-[#D4AF37]/10 to-[#F2D06B]/10 border-b border-[#D4AF37]/20">
-          <div className="flex justify-between items-center mb-4">
-            <div>
-              <h2 className="font-bold text-[#D4AF37] text-lg">Love Vibes Gold</h2>
-              <p className="text-sm text-foreground/80">Unlock exclusive features</p>
-            </div>
-            <div className="w-10 h-10 rounded-full bg-[#D4AF37]/20 flex items-center justify-center">
-              <Crown className="w-6 h-6 text-[#D4AF37]" />
-            </div>
-          </div>
-          <PremiumModal />
-        </section>
+      <div className="flex-1 overflow-y-auto relative z-10 px-8 pt-8 pb-32 space-y-12 no-scrollbar">
 
-        {/* Current Balance */}
-        <div
-          className="p-6"
-          style={{ background: "linear-gradient(160deg, #D4635E 0%, #6B3358 50%, #3D1F3D 100%)" }}
+        {/* Holographic 24K Gold Card - Balance */}
+        <motion.section
+          initial={{ opacity: 0, scale: 0.9, rotateX: 20 }}
+          animate={{ opacity: 1, scale: 1, rotateX: 0 }}
+          transition={{ type: "spring", damping: 15 }}
+          className="relative group perspective-1000"
         >
-          <div className="flex items-center justify-center gap-3 mb-2">
-            <Coins className="w-8 h-8 text-[#D4AF37]" />
-            <span className="text-4xl font-bold text-white">{user.credits || 0}</span>
-          </div>
-          <p className="text-center text-white/80">Your current balance</p>
-        </div>
+          <div className="relative overflow-hidden rounded-[40px] p-10 text-white shadow-[0_30px_60px_-15px_rgba(0,0,0,0.6)] border border-white/10 min-h-[220px] flex flex-col justify-center select-none"
+            style={{
+              background: "linear-gradient(135deg, #1A0814 0%, #2A0D1F 40%, #7A1F3D 100%)",
+            }}
+          >
+            {/* Dynamic Reflection (Holographic Layer) */}
+            <motion.div
+              animate={{
+                x: ['-100%', '200%'],
+                opacity: [0, 0.5, 0]
+              }}
+              transition={{ duration: 4, repeat: Infinity, ease: "easeInOut", repeatDelay: 1 }}
+              className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent skew-x-12 pointer-events-none"
+            />
 
-        {/* What Credits Are For */}
-        <div className="p-4">
-          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">Use credits for</h2>
-          <div className="grid grid-cols-3 gap-3">
-            <div className="p-3 bg-card rounded-xl shadow-card text-center">
-              <Gift className="w-6 h-6 text-[#5A2A4A] mx-auto mb-2" />
-              <p className="text-sm font-medium text-foreground">Send Gifts</p>
-            </div>
-            <div className="p-3 bg-card rounded-xl shadow-card text-center">
-              <Sparkles className="w-6 h-6 text-[#D4AF37] mx-auto mb-2" />
-              <p className="text-sm font-medium text-foreground">Super Likes</p>
-            </div>
-            <div className="p-3 bg-card rounded-xl shadow-card text-center">
-              <Crown className="w-6 h-6 text-[#D4635E] mx-auto mb-2" />
-              <p className="text-sm font-medium text-foreground">Boost Profile</p>
-            </div>
-          </div>
-        </div>
+            {/* Texture/Grain */}
+            <div className="absolute inset-0 opacity-[0.03] pointer-events-none mix-blend-overlay" style={{ backgroundImage: 'url("https://www.transparenttextures.com/patterns/carbon-fibre.png")' }} />
 
-        {/* Credit Packages */}
-        <div className="p-4">
-          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">Choose a package</h2>
-          <div className="space-y-3">
-            {creditPackages.map((pkg) => (
-              <button
-                key={pkg.id}
-                onClick={() => setSelectedPackage(pkg.id)}
-                className={`w-full p-4 rounded-xl border-2 transition-all relative ${selectedPackage === pkg.id
-                    ? "border-[#5A2A4A] bg-[#5A2A4A]/5"
-                    : "border-border bg-card"
-                  }`}
-              >
-                {pkg.popular && (
-                  <span className="absolute -top-2.5 left-4 px-2 py-0.5 bg-[#D4AF37] text-white text-xs font-semibold rounded-full">
-                    Most Popular
+            <div className="relative z-10 flex flex-col items-center">
+              <div className="flex items-center gap-6 mb-6">
+                <motion.div
+                  animate={{ rotate: 360 }}
+                  transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+                  className="w-16 h-16 rounded-[24px] bg-gradient-to-br from-[#FFD700] to-[#B8860B] p-[2px] shadow-[0_0_30px_rgba(212,175,55,0.4)]"
+                >
+                  <div className="w-full h-full rounded-[22px] bg-[#1A0814] flex items-center justify-center">
+                    <Coins className="w-8 h-8 text-[#FFD700]" strokeWidth={2.5} />
+                  </div>
+                </motion.div>
+                <div className="flex flex-col">
+                  <span className="text-[10px] font-black uppercase tracking-[0.3em] text-[#D4AF37]/60 mb-1">Available Assets</span>
+                  <span className="text-7xl font-black tracking-tighter leading-none drop-shadow-[0_4px_10px_rgba(0,0,0,0.5)]">
+                    {user.credits || 0}
                   </span>
-                )}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div
-                      className="w-12 h-12 rounded-full flex items-center justify-center"
-                      style={selectedPackage === pkg.id
-                        ? { background: "linear-gradient(160deg, #D4635E 0%, #5A2A4A 100%)" }
-                        : { background: "#F0ECEA" }
-                      }
-                    >
-                      <Coins className={`w-6 h-6 ${selectedPackage === pkg.id ? "text-white" : "text-foreground"}`} />
-                    </div>
-                    <div className="text-left">
-                      <p className="font-semibold text-foreground">
-                        {pkg.credits} Credits
-                        {pkg.bonus && (
-                          <span className="text-[#4A7C59] ml-2">+{pkg.bonus} bonus</span>
-                        )}
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        ${(pkg.price / (pkg.credits + (pkg.bonus || 0)) * 100).toFixed(1)}c per credit
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xl font-bold text-foreground">${pkg.price}</span>
-                    {selectedPackage === pkg.id && (
-                      <div className="w-6 h-6 rounded-full bg-[#5A2A4A] flex items-center justify-center">
-                        <Check className="w-4 h-4 text-white" />
-                      </div>
-                    )}
-                  </div>
                 </div>
-              </button>
+              </div>
+              <div className="w-full h-[1px] bg-white/10 mb-6" />
+              <div className="flex justify-between items-center w-full">
+                <span className="text-[9px] font-bold text-white/30 tracking-[0.2em] uppercase">Private Encryption Active</span>
+                <div className="flex gap-1">
+                  {[1, 2, 3, 4].map(i => <div key={i} className="w-1.5 h-1.5 rounded-full bg-[#D4AF37]/40 shadow-[0_0_5px_#D4AF37]" />)}
+                </div>
+              </div>
+            </div>
+          </div>
+        </motion.section>
+
+        {/* Elite Floating Tokens Grid */}
+        <section>
+          <div className="grid grid-cols-3 gap-4">
+            {[
+              { icon: <Gift className="w-6 h-6" />, label: "Gifts", bg: "bg-pink-500/10", border: "border-pink-500/30", glow: "shadow-pink-500/20" },
+              { icon: <Sparkles className="w-6 h-6" />, label: "Super", bg: "bg-[#D4AF37]/10", border: "border-[#D4AF37]/30", glow: "shadow-[#D4AF37]/20" },
+              { icon: <Crown className="w-6 h-6" />, label: "Boost", bg: "bg-purple-500/10", border: "border-purple-500/30", glow: "shadow-purple-500/20" },
+            ].map((token, i) => (
+              <motion.div
+                key={i}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.1 * i, type: "spring" }}
+                whileHover={{ y: -8, scale: 1.05 }}
+                className={`flex flex-col items-center p-5 rounded-[28px] ${token.bg} border ${token.border} backdrop-blur-md shadow-xl ${token.glow} relative overflow-hidden group`}
+              >
+                {/* Dynamic Inner Glow */}
+                <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                <div className="mb-3 text-white transition-transform duration-500 group-hover:scale-110">{token.icon}</div>
+                <p className="text-[9px] font-black text-white/60 uppercase tracking-[0.2em]">{token.label}</p>
+              </motion.div>
             ))}
           </div>
-        </div>
+        </section>
 
-        {/* Trust Note */}
-        <div className="px-4 pb-4">
-          <div className="p-4 bg-muted rounded-xl">
-            <p className="text-sm text-muted-foreground text-center">
-              Payments are secure and encrypted. Credits never expire.
-            </p>
+        {/* Next-Gen Package Listing */}
+        <section className="space-y-6">
+          <div className="flex items-center gap-4 group">
+            <h2 className="text-xs font-black uppercase tracking-[0.3em] text-white/30 group-hover:text-[#D4AF37] transition-colors">Digital Acquisitions</h2>
+            <div className="h-[1px] flex-1 bg-gradient-to-r from-white/10 to-transparent" />
           </div>
+
+          <div className="grid grid-cols-1 gap-5">
+            {creditPackages.map((pkg, idx) => (
+              <motion.button
+                key={pkg.id}
+                initial={{ opacity: 0, x: -30 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.1 * idx, type: "spring" }}
+                onClick={() => setSelectedPackage(pkg.id)}
+                className={`relative flex items-center justify-between p-7 rounded-[32px] transition-all duration-500 isolate group overflow-hidden ${selectedPackage === pkg.id
+                  ? "bg-white/5 shadow-[0_20px_40px_-10px_rgba(212,175,55,0.15)] scale-[1.02]"
+                  : "bg-white/[0.02] border border-white/5 hover:bg-white/[0.04]"
+                  }`}
+              >
+                {/* Liquid Selection Highlight */}
+                {selectedPackage === pkg.id && (
+                  <motion.div
+                    layoutId="liquid-bg"
+                    className="absolute inset-0 bg-gradient-to-r from-[#D4AF37]/10 via-[#2A0D1F]/5 to-transparent z-[-1]"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                  />
+                )}
+
+                {/* Left Side: Credits & Visual */}
+                <div className="flex items-center gap-6">
+                  <div className={`relative w-16 h-16 rounded-[22px] flex items-center justify-center transition-all duration-500 shadow-inner ${selectedPackage === pkg.id ? "bg-[#D4AF37] shadow-[0_0_25px_rgba(212,175,55,0.5)]" : "bg-white/5"
+                    }`}>
+                    {selectedPackage === pkg.id ? (
+                      <Check className="w-8 h-8 text-[#1A0814]" strokeWidth={3} />
+                    ) : (
+                      <Coins className="w-8 h-8 text-white/20 group-hover:text-white/50 transition-colors" />
+                    )}
+                  </div>
+                  <div className="text-left">
+                    <div className="flex items-center gap-3">
+                      <p className="text-2xl font-black text-white tracking-tight leading-none">{pkg.credits}</p>
+                      {pkg.bonus && (
+                        <div className="px-2 py-1 rounded-lg bg-[#D4AF37]/10 border border-[#D4AF37]/30">
+                          <p className="text-[8px] font-black text-[#D4AF37] uppercase tracking-widest leading-none">+{pkg.bonus} Extra</p>
+                        </div>
+                      )}
+                    </div>
+                    <p className="text-[10px] text-white/30 font-bold uppercase tracking-widest mt-2">{pkg.id === "popular" ? "High Yield" : "Standard Tier"}</p>
+                  </div>
+                </div>
+
+                {/* Right Side: Price */}
+                <div className="text-right">
+                  <div className="flex items-baseline justify-end gap-1">
+                    <span className="text-[14px] font-black text-[#D4AF37] tracking-tighter">$</span>
+                    <span className="text-3xl font-black text-white tracking-tighter leading-none">{pkg.price}</span>
+                  </div>
+                  <p className="text-[8px] text-white/20 font-black uppercase tracking-[0.2em] mt-1">USD Order</p>
+                </div>
+
+                {/* 24K Badge for Popular */}
+                {pkg.popular && (
+                  <div className="absolute top-0 right-10 rotate-12 translate-y-[-50%] p-1 bg-[#D4AF37] text-[#1A0814] text-[8px] font-black uppercase tracking-widest rounded-md shadow-2xl">
+                    Royal Selection
+                  </div>
+                )}
+              </motion.button>
+            ))}
+          </div>
+        </section>
+
+        {/* Elite Security Note */}
+        <div className="flex items-center justify-center gap-4 opacity-40 grayscale group hover:grayscale-0 hover:opacity-100 transition-all cursor-default">
+          <Shield className="w-4 h-4 text-[#D4AF37]" strokeWidth={2.5} />
+          <p className="text-[9px] font-black uppercase tracking-[0.3em] text-white">Encrypted Terminal Environment</p>
         </div>
       </div>
 
-      {/* Purchase Button */}
-      <div className="p-4 border-t border-border bg-card safe-bottom">
-        <Button
-          className="w-full h-12 bg-[#5A2A4A] hover:bg-[#6B3358] text-white font-semibold text-base rounded-xl"
-          onClick={handlePurchase}
-          disabled={!selectedPackage || isPurchasing}
-        >
-          {isPurchasing ? "Processing..." : `Purchase ${selectedPackage ? creditPackages.find(p => p.id === selectedPackage)?.credits : 0} Credits`}
-        </Button>
-      </div>
+      {/* Futuristic Fixed Purchase Bar */}
+      <AnimatePresence>
+        {selectedPackage && (
+          <motion.div
+            initial={{ y: 150 }}
+            animate={{ y: 0 }}
+            exit={{ y: 150 }}
+            transition={{ type: "spring", damping: 20 }}
+            className="fixed bottom-0 left-0 right-0 p-8 pt-12 pb-10 bg-gradient-to-t from-black via-black/90 to-transparent z-30"
+          >
+            <div className="max-w-md mx-auto relative">
+              {/* Button Inner Glow */}
+              <div className="absolute -inset-1 bg-gradient-to-r from-[#D4AF37] to-[#7A1F3D] rounded-[24px] blur-xl opacity-20 group-hover:opacity-40 transition-opacity" />
+
+              <motion.button
+                whileHover={{ scale: 1.02, y: -2 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={handlePurchase}
+                disabled={isPurchasing}
+                className="w-full h-18 rounded-[22px] bg-white text-[#1A0814] font-black uppercase tracking-[0.3em] text-sm shadow-[0_20px_50px_rgba(255,255,255,0.1)] flex items-center justify-center gap-4 relative overflow-hidden"
+              >
+                {isPurchasing ? (
+                  <div className="w-6 h-6 border-4 border-[#1A0814] border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <>
+                    <Zap className="w-5 h-5 fill-current" />
+                    Initialize Transfer
+                  </>
+                )}
+
+                {/* Micro-Shine */}
+                <motion.div
+                  className="absolute inset-0 bg-gradient-to-r from-transparent via-[#D4AF37]/30 to-transparent skew-x-[30deg]"
+                  animate={{ x: ['-200%', '200%'] }}
+                  transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+                />
+              </motion.button>
+
+              <div className="text-center mt-6">
+                <span className="text-[8px] font-black text-white/30 uppercase tracking-[0.4em]">Transaction Non-Reversible • 256-bit AES</span>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }
