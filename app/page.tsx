@@ -15,7 +15,7 @@ export default function Home() {
       )}
 
       {/* Base gradient matching logo colors - deep plum to coral */}
-      <div 
+      <div
         className="absolute inset-0"
         style={{
           background: "linear-gradient(160deg, #2D1B2E 0%, #5A1F2A 25%, #8B3A3A 50%, #C17767 80%, #E8867C 100%)",
@@ -61,7 +61,7 @@ export default function Home() {
       />
 
       {/* Soft vignette for cinematic depth */}
-      <div 
+      <div
         className="absolute inset-0 pointer-events-none"
         style={{
           background: "radial-gradient(ellipse at center, transparent 0%, rgba(45, 27, 46, 0.5) 100%)",
@@ -79,10 +79,10 @@ export default function Home() {
               height: i < 8 ? 4 + Math.random() * 4 : 2 + Math.random() * 2,
               left: `${Math.random() * 100}%`,
               top: `${Math.random() * 100}%`,
-              backgroundColor: i % 3 === 0 
-                ? "rgba(212, 175, 55, 0.4)" 
-                : i % 3 === 1 
-                  ? "rgba(248, 229, 216, 0.3)" 
+              backgroundColor: i % 3 === 0
+                ? "rgba(212, 175, 55, 0.4)"
+                : i % 3 === 1
+                  ? "rgba(248, 229, 216, 0.3)"
                   : "rgba(232, 134, 124, 0.25)",
               boxShadow: i < 8 ? "0 0 8px rgba(212, 175, 55, 0.3)" : "none",
             }}
@@ -149,9 +149,9 @@ export default function Home() {
           transition={{ duration: 0.6, delay: 0.3 }}
         >
           {/* Outer glow */}
-          <motion.div 
+          <motion.div
             className="absolute inset-0 rounded-3xl"
-            style={{ 
+            style={{
               background: "rgba(212, 175, 55, 0.2)",
               filter: "blur(30px)",
               transform: "scale(1.8)",
@@ -163,16 +163,16 @@ export default function Home() {
             transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
           />
           {/* Inner glow */}
-          <div 
+          <div
             className="absolute inset-0 rounded-3xl"
-            style={{ 
+            style={{
               background: "rgba(232, 134, 124, 0.3)",
               filter: "blur(15px)",
               transform: "scale(1.3)",
             }}
           />
           <img
-            src="/images/love-20vibes-20the-20logo.png"
+            src="/images/love-vibes-the-logo.png"
             alt="Love Vibes"
             className="relative w-28 h-28 md:w-36 md:h-36 rounded-3xl"
             style={{
@@ -189,18 +189,18 @@ export default function Home() {
           transition={{ duration: 0.6, delay: 0.4 }}
         >
           {/* Main Headline - Crimson Pro serif */}
-          <h1 
+          <h1
             className="font-serif text-5xl md:text-6xl font-normal tracking-tight mb-4"
-            style={{ 
+            style={{
               color: "#FFF8F5",
               textShadow: "0 2px 30px rgba(0, 0, 0, 0.4), 0 0 60px rgba(212, 175, 55, 0.15)",
             }}
           >
             Find Your Vibe
           </h1>
-          
+
           {/* Decorative divider */}
-          <motion.div 
+          <motion.div
             className="flex items-center justify-center gap-3 mb-5"
             initial={{ scaleX: 0, opacity: 0 }}
             animate={{ scaleX: showSplash ? 0 : 1, opacity: showSplash ? 0 : 1 }}
@@ -210,9 +210,9 @@ export default function Home() {
             <div className="w-1.5 h-1.5 rounded-full bg-amber-400/60" />
             <div className="h-px w-16 bg-gradient-to-l from-transparent to-amber-400/50" />
           </motion.div>
-          
+
           {/* Subheadline */}
-          <p 
+          <p
             className="text-lg md:text-xl font-light mb-10"
             style={{ color: "rgba(255, 248, 245, 0.8)" }}
           >
@@ -229,14 +229,14 @@ export default function Home() {
             transition={{ duration: 0.6, delay: 0.6 }}
           >
             {/* Gradient border effect */}
-            <div 
+            <div
               className="absolute inset-0 rounded-xl"
               style={{
                 background: "linear-gradient(135deg, rgba(212, 175, 55, 0.5), rgba(248, 229, 216, 0.3), rgba(212, 175, 55, 0.5))",
                 padding: "1px",
               }}
             />
-            <div 
+            <div
               className="relative flex items-center justify-center gap-3 px-8 py-4 rounded-xl text-base font-semibold"
               style={{
                 background: "linear-gradient(135deg, #FFF8F5 0%, #F8EDE8 100%)",
@@ -258,7 +258,7 @@ export default function Home() {
                   repeatDelay: 0.5,
                 }}
               />
-              
+
               <Phone className="w-5 h-5" />
               <span className="relative z-10">Continue with Phone Number</span>
             </div>
@@ -286,7 +286,7 @@ export default function Home() {
           animate={{ opacity: showSplash ? 0 : 0.4 }}
           transition={{ duration: 0.6, delay: 1 }}
         >
-          <div 
+          <div
             className="w-12 h-1 rounded-full"
             style={{ background: "linear-gradient(90deg, transparent, rgba(212, 175, 55, 0.5), transparent)" }}
           />

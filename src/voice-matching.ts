@@ -168,3 +168,34 @@ async function analyzeVoice(audioFile: File): Promise<{
         transcription: 'Voice transcription will appear here...',
     }
 }
+
+export async function handleVoiceMatching(request: Request, env: Env): Promise<Response> {
+    const { verifyAuth } = await import('./auth');
+    const userId = await verifyAuth(request, env);
+    if (!userId) return new Response("Unauthorized", { status: 401 });
+
+    const url = new URL(request.url);
+    const path = url.pathname;
+    const method = request.method;
+
+    if (path === '/v2/voice/upload' && method === 'POST') {
+        const formData = await request.formData();
+        const file = formData.get('file') as unknown as File;
+        if (!file) return new Response("Missing file", { status: 400 });
+        const result = await uploadVoiceProfile(env, userId, file);
+        return new Response(JSON.stringify(result), { headers: { 'Content-Type': 'application/json' } });
+    }
+
+    if (path === '/v2/voice/feed' && method === 'GET') {
+        const result = await getVoiceFeed(env, userId);
+        return new Response(JSON.stringify(result), { headers: { 'Content-Type': 'application/json' } });
+    }
+
+    if (path === '/v2/voice/swipe' && method === 'POST') {
+        const body = await request.json() as any;
+        const result = await voiceSwipe(env, userId, body.target_id, body.action);
+        return new Response(JSON.stringify(result), { headers: { 'Content-Type': 'application/json' } });
+    }
+
+    return new Response("Not Found", { status: 404 });
+}

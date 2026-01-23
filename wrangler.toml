@@ -12,18 +12,16 @@ dataset = "lv_ai"
 binding = "DB"
 database_name = "LoveVibesDB"
 database_id = "e0f583fa-e713-487a-aad4-a34722368f05"
-# Optimize for high-read volume scenarios (Scenario B & C)
-performance_hint = "read_heavy"
 
 # KV Namespace Binding (Geosharding Map)
 [[kv_namespaces]]
 binding = "GEO_KV"
-id = "be22cab4461942bdac552afd7215a0fd" # Placeholder
+id = "be22cab4461942bdac552afd7215a0fd"
 
 # R2 Bucket Binding (Photos/Videos)
 [[r2_buckets]]
 binding = "MEDIA_BUCKET"
-bucket_name = "love-vibes-media"
+bucket_name = "lovevibes"
 
 # Durable Objects (Real-time Chat & Lobbies)
 [[durable_objects.bindings]]
@@ -37,16 +35,13 @@ class_name = "MatchLobby"
 # Migrations for Durable Objects
 [[migrations]]
 tag = "v1"
-new_classes = ["ChatRoom", "MatchLobby"]
+new_sqlite_classes = ["ChatRoom", "MatchLobby"]
 
-# Queue for Async Jobs (Optional: e.g. Image Processing)
-[[queues.producers]]
-  queue = "media-processing-queue"
-  binding = "MEDIA_QUEUE"
 
 [observability]
 enabled = true
 head_sampling_rate = 1
 
 
-
+[pages]
+build_output_dir = "frontend/out"

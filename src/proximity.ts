@@ -229,3 +229,33 @@ export async function respondToProximityAlert(
         return { success: false, message: 'Failed to respond' }
     }
 }
+
+export async function handleProximity(request: Request, env: Env): Promise<Response> {
+    const { verifyAuth } = await import('./auth');
+    const userId = await verifyAuth(request, env);
+    if (!userId) return new Response("Unauthorized", { status: 401 });
+
+    const url = new URL(request.url);
+    const path = url.pathname;
+    const method = request.method;
+
+    if (path === '/v2/proximity/enable' && method === 'POST') {
+        const body = await request.json() as any;
+        const result = await enableProximity(env, userId, body.enabled);
+        return new Response(JSON.stringify(result), { headers: { 'Content-Type': 'application/json' } });
+    }
+
+    if (path === '/v2/proximity/update' && method === 'POST') {
+        const body = await request.json() as any;
+        const result = await updateLocation(env, userId, body.lat, body.long);
+        return new Response(JSON.stringify(result), { headers: { 'Content-Type': 'application/json' } });
+    }
+
+    if (path === '/v2/proximity/respond' && method === 'POST') {
+        const body = await request.json() as any;
+        const result = await respondToProximityAlert(env, body.alert_id, userId, body.response);
+        return new Response(JSON.stringify(result), { headers: { 'Content-Type': 'application/json' } });
+    }
+
+    return new Response("Not Found", { status: 404 });
+}

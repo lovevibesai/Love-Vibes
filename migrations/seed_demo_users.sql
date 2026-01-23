@@ -1,0 +1,8 @@
+-- Demo Users for Love Vibes Testing
+INSERT INTO Users (id, email, name, age, bio, main_photo_url, photo_urls, mode, lat, long, created_at)
+VALUES 
+('demo1', 'emma@demo.lovevibes.app', 'Emma', 26, 'Coffee enthusiast & sunset chaser. Looking for meaningful connections.', 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=800', '["https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=800"]', 0, 25.2048, 55.2708, 1705968000000),
+('demo2', 'sophie@demo.lovevibes.app', 'Sophie', 24, 'Yoga instructor & book lover. Adventure seeker at heart.', 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=800', '["https://images.unsplash.com/photo-1517841905240-472988babdf9?w=800"]', 0, 25.2100, 55.2750, 1705968000000),
+('demo3', 'Maya', 'maya@demo.lovevibes.app', 25, 'Music teacher who loves hiking and spontaneous road trips.', 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=800', '["https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=800"]', 0, 25.1980, 55.2680, 1705968000000),
+('demo4', 'olivia@demo.lovevibes.app', 'Olivia', 27, 'Tech entrepreneur by day, amateur chef by night.', 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=800', '["https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=800"]', 0, 25.2150, 55.2800, 1705968000000),
+('demo5', 'ava@demo.lovevibes.app', 'Ava', 23, 'Artist & dreamer. Looking for someone to share adventures with.', 'https://images.unsplash.com/photo-1488426862026-3ee34a7d66df?w=800', '["https://images.unsplash.com/photo-1488426862026-3ee34a7d66df?w=800"]', 0, 25.2000, 55.2700, 1705968000000);

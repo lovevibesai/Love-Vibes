@@ -158,6 +158,37 @@ function calculateSynchronyScore(
     return Math.min(100, Math.round(score))
 }
 
+export async function handleChemistry(request: Request, env: Env): Promise<Response> {
+    const { verifyAuth } = await import('./auth');
+    const userId = await verifyAuth(request, env);
+    if (!userId) return new Response("Unauthorized", { status: 401 });
+
+    const url = new URL(request.url);
+    const path = url.pathname;
+    const method = request.method;
+
+    if (path === '/v2/chemistry/start' && method === 'POST') {
+        const body = await request.json() as any;
+        const result = await startChemistryTest(env, body.match_id, userId, body.target_id);
+        return new Response(JSON.stringify(result), { headers: { 'Content-Type': 'application/json' } });
+    }
+
+    if (path === '/v2/chemistry/submit' && method === 'POST') {
+        const body = await request.json() as any;
+        const result = await submitChemistryData(env, body.test_id, userId, body.heart_rate_data);
+        return new Response(JSON.stringify(result), { headers: { 'Content-Type': 'application/json' } });
+    }
+
+    if (path.startsWith('/v2/chemistry/results/') && method === 'GET') {
+        const testId = path.split('/').pop();
+        if (!testId) return new Response("Missing test ID", { status: 400 });
+        const result = await getChemistryResults(env, testId);
+        return new Response(JSON.stringify(result), { headers: { 'Content-Type': 'application/json' } });
+    }
+
+    return new Response("Not Found", { status: 404 });
+}
+
 // Client-side PPG implementation helper (for frontend)
 export const PPG_INSTRUCTIONS = `
 /**

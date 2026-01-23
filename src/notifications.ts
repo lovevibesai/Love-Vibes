@@ -112,3 +112,21 @@ export async function notifyProfileView(env: Env, userId: string): Promise<void>
         data: { type: 'view', screen: 'profile' },
     })
 }
+
+export async function handleNotifications(request: Request, env: Env): Promise<Response> {
+    const { verifyAuth } = await import('./auth');
+    const userId = await verifyAuth(request, env);
+    if (!userId) return new Response("Unauthorized", { status: 401 });
+
+    const url = new URL(request.url);
+    const path = url.pathname;
+    const method = request.method;
+
+    if (path === '/v2/notifications/subscribe' && method === 'POST') {
+        const body = await request.json() as any;
+        const result = await subscribeToPush(env, userId, body.subscription);
+        return new Response(JSON.stringify(result), { headers: { 'Content-Type': 'application/json' } });
+    }
+
+    return new Response("Not Found", { status: 404 });
+}

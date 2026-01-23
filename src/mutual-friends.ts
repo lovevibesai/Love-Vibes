@@ -177,3 +177,40 @@ async function hashPhoneNumber(phone: string): Promise<string> {
         .map((b) => b.toString(16).padStart(2, '0'))
         .join('')
 }
+
+export async function handleMutualFriends(request: Request, env: Env): Promise<Response> {
+    const { verifyAuth } = await import('./auth');
+    const userId = await verifyAuth(request, env);
+    if (!userId) return new Response("Unauthorized", { status: 401 });
+
+    const url = new URL(request.url);
+    const path = url.pathname;
+    const method = request.method;
+
+    if (path === '/v2/social/import' && method === 'POST') {
+        const body = await request.json() as any;
+        const result = await importContacts(env, userId, body.contacts);
+        return new Response(JSON.stringify(result), { headers: { 'Content-Type': 'application/json' } });
+    }
+
+    if (path.startsWith('/v2/social/mutual/') && method === 'GET') {
+        const targetId = path.split('/').pop();
+        if (!targetId) return new Response("Missing target ID", { status: 400 });
+        const result = await findMutualFriends(env, userId, targetId);
+        return new Response(JSON.stringify(result), { headers: { 'Content-Type': 'application/json' } });
+    }
+
+    if (path === '/v2/social/request-intro' && method === 'POST') {
+        const body = await request.json() as any;
+        const result = await requestIntroduction(env, userId, body.target_id, body.mutual_friend_id);
+        return new Response(JSON.stringify(result), { headers: { 'Content-Type': 'application/json' } });
+    }
+
+    if (path === '/v2/social/respond-intro' && method === 'POST') {
+        const body = await request.json() as any;
+        const result = await respondToIntroduction(env, body.request_id, userId, body.response, body.message);
+        return new Response(JSON.stringify(result), { headers: { 'Content-Type': 'application/json' } });
+    }
+
+    return new Response("Not Found", { status: 404 });
+}

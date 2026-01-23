@@ -77,7 +77,12 @@ export async function handleAuth(request: Request, env: Env): Promise<Response> 
         const verification = await verifyRegistrationResponse({
             response,
             expectedChallenge: challengeRow.challenge as string,
-            expectedOrigin: `http://${getRpId(env)}:3000`, // Update for production
+            expectedOrigin: [
+                'https://love-vibes-frontend.pages.dev',
+                'https://2428c90c.love-vibes-frontend.pages.dev',
+                `https://${getRpId(env)}`,
+                'http://localhost:3000'
+            ],
             expectedRPID: getRpId(env),
         });
 
@@ -85,18 +90,36 @@ export async function handleAuth(request: Request, env: Env): Promise<Response> 
             const { credential } = verification.registrationInfo;
             const { publicKey: credentialPublicKey, id: credentialID, counter } = credential;
 
-            // Save Credential & Create User
-            await env.DB.prepare(
-                "INSERT INTO UserCredentials (id, user_id, public_key, counter) VALUES (?, ?, ?, ?)"
-            ).bind(Buffer.from(credentialID).toString('base64'), user_id, Buffer.from(credentialPublicKey).toString('base64'), counter).run();
+            // CRITICAL FIX: Check if email already exists to prevent duplicate profiles
+            // If email exists, we merge this new passkey to the EXISTING user ID
+            const existingUser = await env.DB.prepare("SELECT id FROM Users WHERE email = ?").bind(email).first();
 
-            // Create/Update User
-            await env.DB.prepare(
-                "INSERT OR IGNORE INTO Users (id, email, created_at) VALUES (?, ?, ?)"
-            ).bind(user_id, email, Date.now()).run();
+            let finalUserId = user_id;
+            let isNewUser = true;
 
-            const token = await issueToken(user_id, env);
-            return new Response(JSON.stringify({ success: true, token }));
+            if (existingUser) {
+                console.log(`[AUTH] Merging passkey for existing email: ${email}`);
+                finalUserId = existingUser.id as string;
+                isNewUser = false;
+            } else {
+                // Create New User
+                await env.DB.prepare(
+                    "INSERT OR IGNORE INTO Users (id, email, created_at) VALUES (?, ?, ?)"
+                ).bind(user_id, email, Date.now()).run();
+            }
+
+            // Save Credential (linked to correct finalUserId)
+            await env.DB.prepare(
+                "INSERT OR REPLACE INTO UserCredentials (id, user_id, public_key, counter) VALUES (?, ?, ?, ?)"
+            ).bind(Buffer.from(credentialID).toString('base64'), finalUserId, Buffer.from(credentialPublicKey).toString('base64'), counter).run();
+
+            const token = await issueToken(finalUserId, env);
+            return new Response(JSON.stringify({
+                success: true,
+                token,
+                user_id: finalUserId,
+                is_new_user: isNewUser
+            }));
         }
 
         return new Response("Verification failed", { status: 400 });
@@ -125,15 +148,25 @@ export async function handleAuth(request: Request, env: Env): Promise<Response> 
 
         if (storedOtp && storedOtp === otp) {
             // Find or Create User
-            let user: any = await env.DB.prepare("SELECT id FROM Users WHERE email = ?").bind(email).first();
+            let user: any = await env.DB.prepare("SELECT id, name FROM Users WHERE email = ?").bind(email).first();
+            let isNewUser = false;
             if (!user) {
                 const newId = crypto.randomUUID();
                 await env.DB.prepare("INSERT INTO Users (id, email, created_at) VALUES (?, ?, ?)").bind(newId, email, Date.now()).run();
                 user = { id: newId };
+                isNewUser = true;
+            } else {
+                // Check if user has completed profile (has name)
+                isNewUser = !user.name;
             }
 
             const token = await issueToken(user.id, env);
-            return new Response(JSON.stringify({ success: true, token }));
+            return new Response(JSON.stringify({
+                success: true,
+                token,
+                is_new_user: isNewUser,
+                _id: user.id
+            }));
         }
 
         return new Response("Invalid OTP", { status: 400 });
@@ -151,12 +184,20 @@ async function issueToken(userId: string, env: Env) {
 }
 
 export async function verifyAuth(request: Request, env: Env): Promise<string | null> {
+    // Support both Authorization: Bearer <token> and X-Auth-Token: <token>
+    let token: string | null = null;
+
     const authHeader = request.headers.get('Authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+        token = authHeader.split(' ')[1];
+    } else {
+        token = request.headers.get('X-Auth-Token');
+    }
+
+    if (!token) {
         return null;
     }
 
-    const token = authHeader.split(' ')[1];
     try {
         const { payload } = await jwtVerify(token, getJwtSecret(env));
         return payload.uid as string;
@@ -166,25 +207,38 @@ export async function verifyAuth(request: Request, env: Env): Promise<string | n
 }
 
 async function sendEmail(to: string, text: string, env: Env) {
-    if (!env.CLOUDFLARE_API_TOKEN) {
-        console.log(`[DEV MODE] Email to ${to}: ${text}`);
+    const apiKey = env.RESEND_API_KEY || env.CLOUDFLARE_API_TOKEN;
+
+    if (!apiKey) {
+        console.log(`[AUTH] ⚠️ No API Key found for email. OTP for ${to}: ${text}`);
         return;
     }
 
-    // Implementation for Resend API
-    await fetch('https://api.resend.com/emails', {
-        method: 'POST',
-        headers: {
-            'Authorization': `Bearer ${env.CLOUDFLARE_API_TOKEN}`, // Assuming token in env
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-            from: 'Love Vibes <auth@lovevibes.app>',
-            to: [to],
-            subject: 'Login to Love Vibes',
-            text: text
-        })
-    });
+    try {
+        const response = await fetch('https://api.resend.com/emails', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${apiKey}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                from: 'Love Vibes <onboarding@resend.dev>', // Default for unverified domains
+                to: [to],
+                subject: 'Login to Love Vibes',
+                text: text
+            })
+        });
+
+        const result: any = await response.json();
+
+        if (!response.ok) {
+            console.error(`[AUTH] ❌ Resend Error:`, result);
+        } else {
+            console.log(`[AUTH] ✅ Email dispatched via Resend:`, result.id);
+        }
+    } catch (e) {
+        console.error(`[AUTH] ❌ Email Fetch Error:`, e);
+    }
 }
 
 /**

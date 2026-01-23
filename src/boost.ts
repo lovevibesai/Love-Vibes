@@ -96,3 +96,26 @@ export function getBestBoostTime(): { hour: number; reason: string } {
 
     return { hour: 19, reason: 'Evening hours (7-9 PM) have the most activity' }
 }
+
+export async function handleBoost(request: Request, env: Env): Promise<Response> {
+    const { verifyAuth } = await import('./auth');
+    const userId = await verifyAuth(request, env);
+    if (!userId) return new Response("Unauthorized", { status: 401 });
+
+    const url = new URL(request.url);
+    const path = url.pathname;
+    const method = request.method;
+
+    if (path === '/v2/boost/activate' && method === 'POST') {
+        const body = await request.json() as any;
+        const result = await activateBoost(env, userId, body.duration_minutes);
+        return new Response(JSON.stringify(result), { headers: { 'Content-Type': 'application/json' } });
+    }
+
+    if (path === '/v2/boost/status' && method === 'GET') {
+        const result = await getBoostStatus(env, userId);
+        return new Response(JSON.stringify(result), { headers: { 'Content-Type': 'application/json' } });
+    }
+
+    return new Response("Not Found", { status: 404 });
+}

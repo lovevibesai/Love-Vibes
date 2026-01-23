@@ -52,7 +52,8 @@ export async function handleUserUpdate(request: Request, env: Env): Promise<Resp
             'city', 'hometown', 'height', 'relationship_goals', 'drinking',
             'smoking', 'exercise_frequency', 'diet', 'pets', 'interests',
             'languages', 'ethnicity', 'religion', 'has_children',
-            'wants_children', 'star_sign', 'job_title', 'school', 'company'
+            'wants_children', 'star_sign', 'job_title', 'school', 'company',
+            'photo_urls', 'main_photo_url', 'is_verified', 'is_onboarded', 'subscription_tier'
         ];
 
         const updates = [];

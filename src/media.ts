@@ -6,12 +6,44 @@ import { Env } from './index';
 import { verifyAuth } from './auth';
 
 export async function handleMedia(request: Request, env: Env): Promise<Response> {
-    const userId = await verifyAuth(request, env);
-    if (!userId) return new Response("Unauthorized", { status: 401 });
-
     const url = new URL(request.url);
     const method = request.method;
     const path = url.pathname;
+
+    // 0. PUBLIC ACCESS: Serve Image Directly (GET /v2/media/public/:key)
+    // CRITICAL: This must be BEFORE auth because <img> tags don't send tokens
+    if (method === 'GET' && path.startsWith('/v2/media/public/')) {
+        let key = path.replace('/v2/media/public/', '');
+
+        // SAFETY: Decode URI component to handle spaces/special chars in keys
+        try {
+            key = decodeURIComponent(key);
+        } catch (e) {
+            console.error("Failed to decode key:", key);
+        }
+
+        console.log(`[MEDIA] Serving key: ${key}`);
+
+        const object = await env.MEDIA_BUCKET.get(key);
+
+        if (!object) {
+            console.warn(`[MEDIA] Object Not Found: ${key}`);
+            return new Response('Object Not Found', { status: 404 });
+        }
+
+        const headers = new Headers();
+        object.writeHttpMetadata(headers);
+        headers.set('etag', object.httpEtag);
+        // Cache for performance
+        headers.set('Cache-Control', 'public, max-age=31536000');
+
+        return new Response(object.body, {
+            headers,
+        });
+    }
+
+    const userId = await verifyAuth(request, env);
+    if (!userId) return new Response("Unauthorized", { status: 401 });
 
     // 1. Get Direct Upload URL for Cloudflare Stream (GET /v2/media/video-upload-url)
     if (method === 'GET' && pathMatches(path, '/v2/media/video-upload-url')) {
@@ -52,7 +84,10 @@ export async function handleMedia(request: Request, env: Env): Promise<Response>
         if (!file) return new Response("No file provided", { status: 400 });
 
         const fileId = crypto.randomUUID();
-        const extension = file.name.split('.').pop();
+        // Sanitize extension: only alphanumeric
+        const rawExt = file.name.split('.').pop() || 'jpg';
+        const extension = rawExt.replace(/[^a-z0-9]/gi, '').toLowerCase();
+
         const key = `users/${userId}/${type}s/${fileId}.${extension}`;
 
         // 1. Upload to R2
@@ -60,7 +95,10 @@ export async function handleMedia(request: Request, env: Env): Promise<Response>
             httpMetadata: { contentType: file.type }
         });
 
-        const publicUrl = `https://media.lovevibes.app/${key}`; // Replace with actual R2 custom domain
+        // FIXED: Use Worker-served URL instead of custom domain
+        // This ensures it works immediately without DNS configuration
+        const workerUrl = new URL(request.url).origin;
+        const publicUrl = `${workerUrl}/v2/media/public/${key}`;
 
         // 2. AI Moderation Placeholder
         // const isSafe = await env.AI.run("@cf/microsoft/resnet-50", { image: [...file.buffer] });

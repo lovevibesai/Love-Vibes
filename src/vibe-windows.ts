@@ -173,3 +173,26 @@ export async function logVibeWindowActivity(
         .bind(userId, windowStart, windowStart + 3600)
         .run()
 }
+
+export async function handleVibeWindows(request: Request, env: Env): Promise<Response> {
+    const { verifyAuth } = await import('./auth');
+    const userId = await verifyAuth(request, env);
+    if (!userId) return new Response("Unauthorized", { status: 401 });
+
+    const url = new URL(request.url);
+    const path = url.pathname;
+    const method = request.method;
+
+    if (path === '/v2/vibe-windows/set' && method === 'POST') {
+        const body = await request.json() as any;
+        const result = await setVibeWindows(env, userId, body.windows);
+        return new Response(JSON.stringify(result), { headers: { 'Content-Type': 'application/json' } });
+    }
+
+    if (path === '/v2/vibe-windows/status' && method === 'GET') {
+        const result = await getVibeWindowStatus(env, userId);
+        return new Response(JSON.stringify(result), { headers: { 'Content-Type': 'application/json' } });
+    }
+
+    return new Response("Not Found", { status: 404 });
+}

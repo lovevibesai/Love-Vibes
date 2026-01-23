@@ -1,0 +1,942 @@
+# LOVE VIBES - TECHNICAL ALGORITHM IMPLEMENTATION
+## Complete System Architecture & Logic
+
+---
+
+## SYSTEM OVERVIEW
+
+```
+LOVE VIBES PLATFORM
+├── User State Engine
+├── Presence Management System
+├── Dual-Path Connection Engine
+│   ├── LOVE MOMENT (Attraction Path)
+│   └── FRIEND MOMENT (Bonding Path)
+├── Consent & Safety Layer
+├── Matching & Discovery Engine
+└── Session Management System
+```
+
+---
+
+## I. USER STATE ENGINE
+
+### A. State Model
+
+Every user exists in exactly ONE state at any time:
+
+```javascript
+USER_STATES = {
+  OFFLINE: 0,           // Not logged in
+  IDLE: 1,              // Logged in, not in NOW mode
+  NOW_MODE_PENDING: 2,  // Entering NOW mode (readiness check)
+  NOW_MODE_LOVE: 3,     // Available for LOVE MOMENT
+  NOW_MODE_FRIEND: 4,   // Available for FRIEND MOMENT
+  IN_MOMENT: 5,         // Active in a moment
+  POST_MOMENT: 6,       // Cooldown/reflection period
+  SUSPENDED: 7          // Violation response
+}
+```
+
+### B. State Transition Logic
+
+```python
+def transition_to_now_mode(user, mode_type):
+    """
+    Critical: Users cannot enter visibility without explicit readiness
+    """
+    # Step 1: Emotional Readiness Gate
+    if not check_emotional_readiness(user):
+        return False
+    
+    # Step 2: Device capability check
+    if mode_type == "LOVE" and not has_camera(user):
+        return False
+    if mode_type == "FRIEND" and not has_microphone(user):
+        return False
+    
+    # Step 3: Consent layer activation
+    consent_id = create_consent_session(user, mode_type)
+    
+    # Step 4: Presence monitoring initialization
+    start_presence_monitoring(user)
+    
+    # Step 5: State update
+    if mode_type == "LOVE":
+        user.state = NOW_MODE_LOVE
+    else:
+        user.state = NOW_MODE_FRIEND
+    
+    user.now_mode_entry_time = current_timestamp()
+    user.active_consent_id = consent_id
+    
+    return True
+
+def check_emotional_readiness(user):
+    """
+    Prevents distracted/multitasking entry
+    """
+    # User must explicitly confirm:
+    # "I am present, respectful, and open"
+    
+    # Additional checks:
+    if user.app_in_background:
+        return False
+    if user.rapid_state_switching:  # Entered/exited multiple times in 5 min
+        return False
+    if user.has_active_penalty:
+        return False
+    
+    return user.explicit_readiness_confirmation == True
+```
+
+---
+
+## II. PRESENCE MANAGEMENT SYSTEM
+
+### A. Real-Time Presence Detection
+
+```python
+class PresenceMonitor:
+    """
+    Continuous consent = continuous presence
+    """
+    
+    def __init__(self, user):
+        self.user = user
+        self.last_activity = current_timestamp()
+        self.presence_signals = []
+        
+    def check_presence(self):
+        """
+        Called every 2 seconds during NOW mode
+        """
+        signals = {
+            'app_foreground': self.is_app_foreground(),
+            'screen_on': self.is_screen_on(),
+            'camera_active': self.is_camera_active(),  # For LOVE mode
+            'mic_active': self.is_mic_active(),        # For FRIEND mode
+            'touch_activity': self.recent_touch_activity(5),  # Within 5 sec
+            'network_stable': self.is_network_stable()
+        }
+        
+        self.presence_signals.append(signals)
+        
+        # Critical violations (immediate disconnect)
+        if not signals['app_foreground']:
+            return self.trigger_presence_loss("app_background")
+        
+        if not signals['screen_on']:
+            return self.trigger_presence_loss("screen_locked")
+        
+        # Mode-specific violations
+        if self.user.state == NOW_MODE_LOVE:
+            if not signals['camera_active']:
+                return self.trigger_presence_loss("camera_disabled")
+        
+        if self.user.state == NOW_MODE_FRIEND:
+            if not signals['mic_active']:
+                return self.trigger_presence_loss("mic_disabled")
+        
+        # Soft presence degradation (warn then disconnect)
+        if not signals['touch_activity'] and not self.user.in_active_moment:
+            self.idle_seconds += 2
+            if self.idle_seconds > 30:
+                return self.trigger_presence_loss("idle_timeout")
+        
+        return True
+    
+    def trigger_presence_loss(self, reason):
+        """
+        Presence loss = Consent withdrawal
+        """
+        if self.user.in_active_moment:
+            # Notify other party
+            notify_moment_partner(self.user, f"Connection lost: {reason}")
+            end_moment_session(self.user, reason="presence_loss")
+        
+        # Remove from discovery pool immediately
+        remove_from_visibility(self.user)
+        
+        # State transition
+        self.user.state = IDLE
+        self.user.presence_loss_reason = reason
+        
+        log_presence_event(self.user, reason)
+        
+        return False
+```
+
+### B. Network & Device Monitoring
+
+```python
+def continuous_device_check(user):
+    """
+    Runs parallel to presence monitoring
+    """
+    checks = {
+        'battery_level': get_battery_level(user.device),
+        'network_quality': measure_network_quality(user),
+        'cpu_temperature': get_device_temp(user.device),
+        'available_memory': get_available_memory(user.device)
+    }
+    
+    # Predictive disconnection prevention
+    if checks['battery_level'] < 10:
+        warn_user(user, "Low battery may interrupt your moment")
+    
+    if checks['network_quality'] < MINIMUM_QUALITY_THRESHOLD:
+        warn_user(user, "Network quality degraded")
+        if checks['network_quality'] < CRITICAL_THRESHOLD:
+            graceful_disconnect(user, "network_failure")
+    
+    return checks
+```
+
+---
+
+## III. LOVE MOMENT - ATTRACTION PATH ALGORITHM
+
+### A. Discovery & Matching Logic
+
+```python
+class LoveMomentMatcher:
+    """
+    Optimizes for: Silent visual perception, mutual recognition
+    """
+    
+    def find_potential_match(self, user_a):
+        """
+        Critical: No profile browsing, no choice paralysis
+        Returns: Single best match or None
+        """
+        
+        # Step 1: Filter eligible pool
+        eligible_pool = self.get_eligible_users(user_a)
+        
+        # Step 2: Apply matching criteria
+        scored_candidates = []
+        for user_b in eligible_pool:
+            score = self.calculate_compatibility(user_a, user_b)
+            scored_candidates.append((user_b, score))
+        
+        # Step 3: Select single best match
+        if not scored_candidates:
+            return None
+        
+        # Sort by score, take top candidate
+        scored_candidates.sort(key=lambda x: x[1], reverse=True)
+        best_match = scored_candidates[0][0]
+        
+        return best_match
+    
+    def get_eligible_users(self, user_a):
+        """
+        Hard filters - no exceptions
+        """
+        pool = get_users_in_state(NOW_MODE_LOVE)
+        
+        filtered = []
+        for user_b in pool:
+            # Cannot be self
+            if user_b.id == user_a.id:
+                continue
+            
+            # Must have active presence
+            if not user_b.presence_active:
+                continue
+            
+            # Cannot be recently interacted
+            if self.recently_interacted(user_a, user_b, hours=24):
+                continue
+            
+            # Cannot be blocked/reported
+            if self.has_negative_history(user_a, user_b):
+                continue
+            
+            # Age verification check
+            if not self.age_compatible(user_a, user_b):
+                continue
+            
+            # Geographic proximity (optional filter)
+            if user_a.location_filter_enabled:
+                if not self.within_distance(user_a, user_b, user_a.max_distance):
+                    continue
+            
+            # Orientation compatibility
+            if not self.orientation_compatible(user_a, user_b):
+                continue
+            
+            filtered.append(user_b)
+        
+        return filtered
+    
+    def calculate_compatibility(self, user_a, user_b):
+        """
+        Weighted scoring - NOT profile-based
+        """
+        score = 0.0
+        
+        # 1. Temporal alignment (30% weight)
+        # Users online at same time are more serious
+        score += 0.3 * self.temporal_alignment_score(user_a, user_b)
+        
+        # 2. Behavioral quality (25% weight)
+        # Users with positive interaction history ranked higher
+        score += 0.25 * self.behavioral_quality_score(user_b)
+        
+        # 3. Reciprocal interest potential (20% weight)
+        # Basic demographic alignment (age range, etc.)
+        score += 0.2 * self.demographic_alignment(user_a, user_b)
+        
+        # 4. Session freshness (15% weight)
+        # Prefer users who just entered NOW mode
+        score += 0.15 * self.session_freshness_score(user_b)
+        
+        # 5. Randomization factor (10% weight)
+        # Prevents echo chambers, adds serendipity
+        score += 0.1 * random.random()
+        
+        return score
+    
+    def behavioral_quality_score(self, user):
+        """
+        Measures: How well does this person treat others?
+        """
+        metrics = {
+            'completion_rate': user.moments_completed / max(user.moments_initiated, 1),
+            'mutual_stay_rate': user.mutual_stays / max(user.moments_completed, 1),
+            'report_count': user.reports_received,
+            'avg_moment_duration': user.avg_moment_duration,
+            'respectful_exit_rate': user.respectful_exits / max(user.total_exits, 1)
+        }
+        
+        # High completion rate = stays in moments
+        score = metrics['completion_rate'] * 0.3
+        
+        # High mutual stay = genuine connection
+        score += metrics['mutual_stay_rate'] * 0.3
+        
+        # No reports = safe user
+        if metrics['report_count'] == 0:
+            score += 0.2
+        else:
+            score -= min(metrics['report_count'] * 0.1, 0.5)
+        
+        # Longer average duration = engaged
+        if metrics['avg_moment_duration'] > 60:  # More than 1 minute
+            score += 0.1
+        
+        # Respectful exits = emotional maturity
+        score += metrics['respectful_exit_rate'] * 0.1
+        
+        return max(0, min(score, 1.0))  # Clamp to [0, 1]
+```
+
+### B. Love Moment Session Flow
+
+```python
+class LoveMomentSession:
+    """
+    The actual moment - 8-15 seconds of silent presence
+    """
+    
+    def __init__(self, user_a, user_b):
+        self.user_a = user_a
+        self.user_b = user_b
+        self.session_id = generate_session_id()
+        self.start_time = None
+        self.phase = "INITIALIZING"
+        
+    def start_moment(self):
+        """
+        Silent video connection initiation
+        """
+        # Step 1: Establish video streams
+        video_a = initialize_video_stream(self.user_a)
+        video_b = initialize_video_stream(self.user_b)
+        
+        if not (video_a and video_b):
+            return self.abort_moment("video_initialization_failed")
+        
+        # Step 2: Mutual visibility confirmation
+        # Both users see each other simultaneously
+        establish_bidirectional_stream(self.user_a, self.user_b)
+        
+        # Step 3: Start timer
+        self.start_time = current_timestamp()
+        self.phase = "PRESENCE"
+        
+        # Step 4: Silence enforcement
+        # Mute audio channels (video only)
+        mute_audio(self.user_a)
+        mute_audio(self.user_b)
+        
+        # Step 5: UI overlay
+        # Show subtle timer (8-15 seconds remaining)
+        show_moment_ui(self.user_a, self.session_id)
+        show_moment_ui(self.user_b, self.session_id)
+        
+        # Step 6: Monitor presence continuously
+        self.monitor_loop()
+    
+    def monitor_loop(self):
+        """
+        Runs every 100ms during the moment
+        """
+        while self.phase == "PRESENCE":
+            elapsed = current_timestamp() - self.start_time
+            
+            # Check presence for both users
+            if not check_user_presence(self.user_a):
+                return self.abort_moment("user_a_presence_lost")
+            if not check_user_presence(self.user_b):
+                return self.abort_moment("user_b_presence_lost")
+            
+            # Minimum duration: 8 seconds
+            if elapsed >= 8:
+                self.enable_decision_ui()
+            
+            # Maximum duration: 15 seconds
+            if elapsed >= 15:
+                self.force_decision()
+            
+            sleep(0.1)  # 100ms polling
+    
+    def enable_decision_ui(self):
+        """
+        After 8 seconds, allow users to make choice
+        """
+        self.phase = "DECISION"
+        
+        # Show decision buttons (compassionate language)
+        show_decision_ui(self.user_a, [
+            "I feel a connection",
+            "I respectfully let go"
+        ])
+        show_decision_ui(self.user_b, [
+            "I feel a connection", 
+            "I respectfully let go"
+        ])
+        
+        # Wait for both decisions (max 7 more seconds)
+        self.wait_for_decisions()
+    
+    def wait_for_decisions(self):
+        """
+        Collects decisions from both users
+        """
+        decision_a = None
+        decision_b = None
+        
+        timeout = 7  # seconds
+        start = current_timestamp()
+        
+        while True:
+            # Check for decisions
+            if not decision_a:
+                decision_a = get_user_decision(self.user_a)
+            if not decision_b:
+                decision_b = get_user_decision(self.user_b)
+            
+            # Both decided
+            if decision_a and decision_b:
+                return self.process_decisions(decision_a, decision_b)
+            
+            # Timeout
+            if current_timestamp() - start > timeout:
+                return self.handle_timeout(decision_a, decision_b)
+            
+            sleep(0.1)
+    
+    def process_decisions(self, decision_a, decision_b):
+        """
+        Critical: Mutual connection required
+        """
+        # Both chose connection
+        if decision_a == "CONNECT" and decision_b == "CONNECT":
+            self.phase = "MUTUAL_MATCH"
+            return self.open_post_moment_space()
+        
+        # At least one chose to let go
+        else:
+            self.phase = "RELEASED"
+            return self.graceful_release()
+    
+    def open_post_moment_space(self):
+        """
+        Slow escalation: Text first
+        """
+        # Step 1: End video stream
+        end_video_streams(self.user_a, self.user_b)
+        
+        # Step 2: Create text chat space
+        chat_session = create_chat_session(self.user_a, self.user_b)
+        
+        # Step 3: Set initial constraints
+        # - Text only for first 2 minutes
+        # - Voice unlock after genuine conversation
+        # - Video unlock after both request it
+        
+        chat_session.escalation_level = "TEXT_ONLY"
+        chat_session.voice_unlock_time = current_timestamp() + 120  # 2 min
+        
+        # Step 4: Notify users
+        notify_match(self.user_a, self.user_b, chat_session.id)
+        
+        # Step 5: Log successful match
+        log_successful_match(self.session_id, self.user_a, self.user_b)
+        
+        return chat_session
+    
+    def graceful_release(self):
+        """
+        No penalty for non-match
+        """
+        # End video streams
+        end_video_streams(self.user_a, self.user_b)
+        
+        # Show compassionate message
+        show_message(self.user_a, "Thank you for the moment")
+        show_message(self.user_b, "Thank you for the moment")
+        
+        # Return both to discovery pool
+        # CRITICAL: Never show same pair again in 24h
+        add_to_exclusion_list(self.user_a, self.user_b, hours=24)
+        add_to_exclusion_list(self.user_b, self.user_a, hours=24)
+        
+        # State transition
+        self.user_a.state = NOW_MODE_LOVE
+        self.user_b.state = NOW_MODE_LOVE
+        
+        # Log non-match (for algorithm improvement)
+        log_non_match(self.session_id, self.user_a, self.user_b)
+        
+        return None
+    
+    def abort_moment(self, reason):
+        """
+        Technical failure or presence loss
+        """
+        # Clean disconnect
+        end_video_streams(self.user_a, self.user_b)
+        
+        # Inform users
+        notify_moment_interrupted(self.user_a, reason)
+        notify_moment_interrupted(self.user_b, reason)
+        
+        # Log technical issue
+        log_moment_abort(self.session_id, reason)
+        
+        return None
+```
+
+---
+
+## IV. FRIEND MOMENT - BONDING PATH ALGORITHM
+
+### A. Friend Matching Logic
+
+```python
+class FriendMomentMatcher:
+    """
+    Optimizes for: Voice-based warmth, humor, openness
+    """
+    
+    def find_friend_match(self, user_a):
+        """
+        Similar to Love matching but different weights
+        """
+        eligible_pool = self.get_eligible_friend_pool(user_a)
+        
+        if not eligible_pool:
+            return None
+        
+        scored_candidates = []
+        for user_b in eligible_pool:
+            score = self.calculate_friend_compatibility(user_a, user_b)
+            scored_candidates.append((user_b, score))
+        
+        scored_candidates.sort(key=lambda x: x[1], reverse=True)
+        return scored_candidates[0][0]
+    
+    def calculate_friend_compatibility(self, user_a, user_b):
+        """
+        Different from love matching
+        """
+        score = 0.0
+        
+        # 1. Conversational quality (35% weight)
+        # Users who engage well in conversation
+        score += 0.35 * self.conversation_quality_score(user_b)
+        
+        # 2. Interest alignment (25% weight)
+        # Shared interests aid natural conversation
+        score += 0.25 * self.interest_alignment(user_a, user_b)
+        
+        # 3. Behavioral warmth (20% weight)
+        # Kind, open users preferred
+        score += 0.2 * self.warmth_score(user_b)
+        
+        # 4. Temporal alignment (10% weight)
+        score += 0.1 * self.temporal_alignment_score(user_a, user_b)
+        
+        # 5. Randomization (10% weight)
+        score += 0.1 * random.random()
+        
+        return score
+    
+    def conversation_quality_score(self, user):
+        """
+        Measures engagement and reciprocity
+        """
+        metrics = {
+            'avg_conversation_length': user.avg_friend_moment_duration,
+            'response_rate': user.friend_messages_sent / max(user.friend_messages_received, 1),
+            'humor_score': user.humor_interactions / max(user.total_friend_moments, 1),
+            'continuation_rate': user.friend_moments_continued / max(user.friend_moments_started, 1)
+        }
+        
+        score = 0.0
+        
+        # Longer conversations = engaged
+        if metrics['avg_conversation_length'] > 300:  # 5 minutes
+            score += 0.3
+        elif metrics['avg_conversation_length'] > 180:  # 3 minutes
+            score += 0.2
+        
+        # Balanced response rate (between 0.7 and 1.3)
+        if 0.7 <= metrics['response_rate'] <= 1.3:
+            score += 0.3  # Good reciprocity
+        
+        # Humor signals warmth
+        score += min(metrics['humor_score'] * 0.2, 0.2)
+        
+        # Continuation shows genuine interest
+        score += metrics['continuation_rate'] * 0.2
+        
+        return score
+```
+
+### B. Friend Moment Session Flow
+
+```python
+class FriendMomentSession:
+    """
+    Voice-first compassionate interaction
+    """
+    
+    def __init__(self, user_a, user_b):
+        self.user_a = user_a
+        self.user_b = user_b
+        self.session_id = generate_session_id()
+        self.start_time = None
+        self.conversation_turns = []
+        
+    def start_friend_moment(self):
+        """
+        Audio connection with soft opening
+        """
+        # Step 1: Establish audio streams
+        audio_a = initialize_audio_stream(self.user_a)
+        audio_b = initialize_audio_stream(self.user_b)
+        
+        if not (audio_a and audio_b):
+            return self.abort_moment("audio_initialization_failed")
+        
+        # Step 2: Show opening prompt (optional)
+        # Emotionally safe conversation starters
+        prompt = self.select_opening_prompt()
+        show_prompt(self.user_a, prompt)
+        show_prompt(self.user_b, prompt)
+        
+        # Step 3: Start conversation
+        self.start_time = current_timestamp()
+        self.phase = "CONVERSATION"
+        
+        # Step 4: Monitor conversation flow
+        self.monitor_conversation()
+    
+    def select_opening_prompt(self):
+        """
+        Emotionally safe, non-interrogative prompts
+        """
+        prompts = [
+            "What's been on your mind lately?",
+            "What's something simple you enjoy?",
+            "Tell me about your day",
+            "What made you smile recently?",
+            "What are you looking forward to?",
+            "What's something you're curious about?",
+            "How have you been feeling lately?",
+            "What's a small thing that makes you happy?"
+        ]
+        
+        return random.choice(prompts)
+    
+    def monitor_conversation(self):
+        """
+        Detects: Flow quality, consent drift, connection strength
+        """
+        while self.phase == "CONVERSATION":
+            # Presence check
+            if not check_user_presence(self.user_a):
+                return self.handle_disconnect(self.user_a, "presence_loss")
+            if not check_user_presence(self.user_b):
+                return self.handle_disconnect(self.user_b, "presence_loss")
+            
+            # Conversation metrics
+            metrics = self.analyze_conversation_state()
+            
+            # Detect consent drift
+            if self.detect_consent_drift(metrics):
+                return self.gentle_intervention()
+            
+            # Detect strong connection
+            if self.detect_strong_bond(metrics):
+                self.offer_continuation()
+            
+            # Natural time limits
+            elapsed = current_timestamp() - self.start_time
+            if elapsed > 600:  # 10 minutes
+                self.suggest_natural_closure()
+            
+            sleep(1)  # 1 second polling
+    
+    def analyze_conversation_state(self):
+        """
+        Real-time conversation analysis
+        """
+        recent_window = 30  # Last 30 seconds
+        recent_events = self.get_recent_events(recent_window)
+        
+        metrics = {
+            'silence_duration': self.calculate_silence_duration(recent_events),
+            'turn_balance': self.calculate_turn_balance(recent_events),
+            'energy_level': self.estimate_energy_level(recent_events),
+            'laughter_detected': self.detect_laughter(recent_events),
+            'response_latency': self.calculate_response_latency(recent_events)
+        }
+        
+        return metrics
+    
+    def detect_consent_drift(self, metrics):
+        """
+        Critical: Detect when someone becomes uncomfortable
+        """
+        # Long silences (>20 seconds)
+        if metrics['silence_duration'] > 20:
+            return True
+        
+        # Heavily imbalanced conversation (80/20 split)
+        if metrics['turn_balance'] < 0.2 or metrics['turn_balance'] > 0.8:
+            return True
+        
+        # Energy drop (detected through audio amplitude, pace)
+        if metrics['energy_level'] < 0.3:
+            return True
+        
+        # Very slow responses (disengagement)
+        if metrics['response_latency'] > 10:  # >10 seconds to respond
+            return True
+        
+        return False
+    
+    def gentle_intervention(self):
+        """
+        Protect emotional dignity
+        """
+        # Show gentle exit option to BOTH users
+        show_gentle_exit_option(self.user_a, 
+            "It's okay to end the conversation whenever you'd like")
+        show_gentle_exit_option(self.user_b,
+            "It's okay to end the conversation whenever you'd like")
+        
+        # Wait 10 seconds
+        sleep(10)
+        
+        # If no improvement, auto-close gracefully
+        if self.phase == "CONVERSATION":
+            self.graceful_closure("consent_drift_detected")
+    
+    def detect_strong_bond(self, metrics):
+        """
+        Positive signals: Laughter, balanced turns, high energy
+        """
+        # Multiple laughter events
+        if metrics['laughter_detected'] >= 3:
+            return True
+        
+        # Very balanced conversation (45/55 to 55/45)
+        if 0.45 <= metrics['turn_balance'] <= 0.55:
+            # AND high energy
+            if metrics['energy_level'] > 0.7:
+                return True
+        
+        return False
+    
+    def offer_continuation(self):
+        """
+        Optional: Extend or connect further
+        """
+        show_continuation_option(self.user_a,
+            "Would you like to continue talking?")
+        show_continuation_option(self.user_b,
+            "Would you like to continue talking?")
+        
+        # Wait for mutual agreement (30 second window)
+        decision_a = wait_for_decision(self.user_a, 30)
+        decision_b = wait_for_decision(self.user_b, 30)
+        
+        if decision_a == "CONTINUE" and decision_b == "CONTINUE":
+            # Extend session
+            self.extend_session()
+        else:
+            # Natural closure
+            self.graceful_closure("natural_end")
+    
+    def graceful_closure(self, reason):
+        """
+        End with appreciation
+        """
+        # Show appreciation message
+        show_message(self.user_a, "Thank you for the conversation")
+        show_message(self.user_b, "Thank you for the conversation")
+        
+        # Optional: Offer to connect again
+        if reason != "consent_drift_detected":
+            show_reconnect_option(self.user_a, self.user_b)
+            show_reconnect_option(self.user_b, self.user_a)
+        
+        # Close audio streams
+        close_audio_streams(self.user_a, self.user_b)
+        
+        # Log session
+        log_friend_moment(self.session_id, reason, 
+            duration=current_timestamp() - self.start_time)
+        
+        # Return to pool
+        self.user_a.state = NOW_MODE_FRIEND
+        self.user_b.state = NOW_MODE_FRIEND
+```
+
+---
+
+## V. CONSENT & SAFETY LAYER
+
+### A. Continuous Consent Validation
+
+```python
+class ConsentEngine:
+    """
+    Consent is continuous, not one-time
+    """
+    
+    def create_consent_session(self, user, mode):
+        """
+        Initialize consent tracking
+        """
+        consent = {
+            'user_id': user.id,
+            'session_id': generate_consent_id(),
+            'mode': mode,
+            'start_time': current_timestamp(),
+            'consent_active': True,
+            'presence_checks': [],
+            'violations': []
+        }
+        
+        store_consent_session(consent)
+        return consent['session_id']
+    
+    def validate_consent(self, user):
+        """
+        Called continuously during interaction
+        """
+        consent_session = get_active_consent(user)
+        
+        if not consent_session:
+            return False
+        
+        # Check presence signals
+        presence_valid = check_presence_signals(user)
+        
+        # Log check
+        consent_session['presence_checks'].append({
+            'timestamp': current_timestamp(),
+            'valid': presence_valid
+        })
+        
+        if not presence_valid:
+            self.withdraw_consent(user, "presence_lost")
+            return False
+        
+        return True
+    
+    def withdraw_consent(self, user, reason):
+        """
+        Immediate consent withdrawal
+        """
+        consent_session = get_active_consent(user)
+        
+        if consent_session:
+            consent_session['consent_active'] = False
+            consent_session['withdrawal_reason'] = reason
+            consent_session['end_time'] = current_timestamp()
+        
+        # Trigger disconnection
+        if user.in_active_moment:
+            force_disconnect(user, reason)
+```
+
+### B. Violation Detection System
+
+```python
+class ViolationDetector:
+    """
+    Multi-layer violation detection
+    """
+    
+    HARD_VIOLATIONS = [
+        'RECORDING_ATTEMPT',
+        'SCREENSHOT_ATTEMPT',
+        'SEXUAL_EXPOSURE',
+        'EXPLICIT_HARASSMENT',
+        'HATE_SPEECH',
+        'REPEATED_BOUNDARY_PUSH'
+    ]
+    
+    SOFT_VIOLATIONS = [
+        'IGNORING_EXIT',
+        'PRESSURE_FOR_ESCALATION',
+        'UNCOMFORTABLE_BEHAVIOR',
+        'MANIPULATIVE_LANGUAGE'
+    ]
+    
+    def monitor_session(self, session):
+        """
+        Real-time behavioral monitoring
+        """
+        while session.active:
+            # Check for hard violations
+            hard_violation = self.detect_hard_violation(session)
+            if hard_violation:
+                self.handle_hard_violation(session, hard_violation)
+                break
+            
+            # Check for soft violations
+            soft_violation = self.detect_soft_violation(session)
+            if soft_violation:
+                self.handle_soft_violation(session, soft_violation)
+            
+            sleep(1)
+    
+    def detect_hard_violation(self, session):
+        """
+        Zero-tolerance detection
+        """
+        # Screenshot detection (device-level if possible)
+        if detect_screenshot_attempt(session.user_a):
+            return {'type': 'SCREENSHOT_ATTEMPT', 'user': session.user_a}
+        if detect_screenshot_attempt(session.user_b):
+            return

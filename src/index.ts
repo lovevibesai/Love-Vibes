@@ -13,6 +13,13 @@ import { handleReportUser, handleBlockUser } from './safety';
 import { handleMedia } from './media';
 import { getPrompts, saveUserPrompts, getUserPrompts } from './prompts';
 import { getReferralStats, unlockScenario } from './referrals';
+import { handleVibeWindows } from './vibe-windows';
+import { handleChemistry } from './chemistry';
+import { handleVoiceMatching } from './voice-matching';
+import { handleProximity } from './proximity';
+import { handleBoost } from './boost';
+import { handleMutualFriends } from './mutual-friends';
+import { handleNotifications } from './notifications';
 
 export { ChatRoom, MatchLobby } from './durable_objects';
 
@@ -28,6 +35,7 @@ export interface Env {
     CLOUDFLARE_API_TOKEN?: string;
     JWT_SECRET?: string;
     RP_ID?: string;
+    RESEND_API_KEY?: string;
 }
 
 /**
@@ -57,11 +65,11 @@ export function trackEvent(env: Env, eventName: string, data: Record<string, any
 
 export default {
     async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-        // CORS Headers
         const corsHeaders = {
             'Access-Control-Allow-Origin': '*',
             'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
             'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Auth-Token, CF-Turnstile-Response',
+            'Access-Control-Max-Age': '86400',
         };
 
         if (request.method === 'OPTIONS') {
@@ -71,20 +79,18 @@ export default {
         try {
             const response = await handleRequest(request, env);
 
-            // Clone response to add headers
-            const newHeaders = new Headers(response.headers);
-            Object.entries(corsHeaders).forEach(([k, v]) => newHeaders.set(k, v));
+            // Create a new response with the same body and status, but with CORS headers
+            const newResponse = new Response(response.body, response);
+            Object.entries(corsHeaders).forEach(([k, v]) => newResponse.headers.set(k, v));
 
-            return new Response(response.body, {
-                status: response.status,
-                statusText: response.statusText,
-                headers: newHeaders
-            });
-
+            return newResponse;
         } catch (e: any) {
             return new Response(JSON.stringify({ error: e.message }), {
                 status: 500,
-                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+                headers: {
+                    ...corsHeaders,
+                    'Content-Type': 'application/json'
+                }
             });
         }
     },
@@ -184,6 +190,41 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         return new Response(JSON.stringify(result), {
             headers: { 'Content-Type': 'application/json' }
         });
+    }
+
+    // 12. Vibe Windows
+    if (path.startsWith('/v2/vibe-windows')) {
+        return await handleVibeWindows(request, env);
+    }
+
+    // 13. Chemistry Test
+    if (path.startsWith('/v2/chemistry')) {
+        return await handleChemistry(request, env);
+    }
+
+    // 14. Voice Matching
+    if (path.startsWith('/v2/voice')) {
+        return await handleVoiceMatching(request, env);
+    }
+
+    // 15. Proximity Alerts
+    if (path.startsWith('/v2/proximity')) {
+        return await handleProximity(request, env);
+    }
+
+    // 16. Profile Boost
+    if (path.startsWith('/v2/boost')) {
+        return await handleBoost(request, env);
+    }
+
+    // 17. Mutual Friends & Social
+    if (path.startsWith('/v2/social')) {
+        return await handleMutualFriends(request, env);
+    }
+
+    // 18. Push Notifications
+    if (path.startsWith('/v2/notifications')) {
+        return await handleNotifications(request, env);
     }
 
     // 8. Durable Object Routes (Chat / WebSocket)
