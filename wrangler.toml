@@ -43,5 +43,3 @@ enabled = true
 head_sampling_rate = 1
 
 
-[pages]
-build_output_dir = "frontend/out"
