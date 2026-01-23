@@ -10,6 +10,7 @@ export function ModeScreen() {
 
   const handleModeSelect = (selectedMode: AppMode) => {
     setMode(selectedMode)
+    localStorage.setItem('current_screen', 'profile-setup');
     setCurrentScreen("profile-setup")
   }
 

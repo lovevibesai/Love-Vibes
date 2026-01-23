@@ -5,35 +5,60 @@ import { useApp } from "@/lib/app-context"
 import { motion, AnimatePresence } from "framer-motion"
 import {
   ArrowLeft,
-  MapPin,
   Navigation,
   Search,
   Zap,
   Globe,
-  Satellite,
-  Radar
+  Satellite
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { EliteGuidance } from "../ui/elite-guidance"
+import { api } from "@/lib/api-client"
 
 export function LocationScreen() {
-  const { setCurrentScreen, setIsOnboarded } = useApp()
+  const { setCurrentScreen, setIsOnboarded, user, updateUser } = useApp()
   const [showManual, setShowManual] = useState(false)
   const [city, setCity] = useState("")
   const [isLoading, setIsLoading] = useState(false)
 
-  const handleEnableLocation = () => {
+  const handleEnableLocation = async () => {
     setIsLoading(true)
-    setTimeout(() => {
-      setIsLoading(false)
+    try {
+      const { Geolocation } = await import('@capacitor/geolocation')
+      const position = await Geolocation.getCurrentPosition()
+
+      const { latitude, longitude } = position.coords
+
+      // Update backend with real coordinates
+      await api.proximity.updateLocation(latitude, longitude)
+
+      // Enable proximity protocol
+      await api.proximity.toggle(true)
+
+      // Update local state and persist
+      if (user) {
+        updateUser({
+          ...user,
+          userLocation: `Lat: ${latitude.toFixed(2)}, Lng: ${longitude.toFixed(2)}`
+        })
+      }
+
+      localStorage.setItem('is_onboarded', 'true');
       setIsOnboarded(true)
       setCurrentScreen("feed")
-    }, 1800)
+    } catch (err) {
+      console.error("Location error:", err)
+      // Fallback to manual if GPS fails
+      setShowManual(true)
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   const handleManualSubmit = () => {
     if (city.length > 0) {
       setIsOnboarded(true)
+      localStorage.setItem('is_onboarded', 'true');
       setCurrentScreen("feed")
     }
   }
@@ -95,6 +120,13 @@ export function LocationScreen() {
           </motion.div>
           <h1 className="text-4xl font-black text-white tracking-tighter leading-none">Find Vibes Nearby</h1>
           <p className="text-sm text-white/40 font-medium tracking-wide">Establish your presence in the sovereign field.</p>
+
+          <div className="mx-auto max-w-[280px] mt-4 p-4 rounded-2xl bg-white/5 border border-white/10">
+            <p className="text-[10px] font-black text-white/40 uppercase tracking-widest mb-1">Final Step</p>
+            <p className="text-[11px] text-white/60 leading-relaxed font-medium">
+              Activating your coordinates unlocks the <span className="text-[#D4AF37]">Proximity Radar</span>. This is the last step before full protocol access.
+            </p>
+          </div>
         </div>
 
         {/* Holographic Radar Animation */}

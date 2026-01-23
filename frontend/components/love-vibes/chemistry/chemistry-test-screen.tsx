@@ -1,25 +1,58 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useApp } from "@/lib/app-context"
 import { Button } from "@/components/ui/button"
-import { ChevronLeft } from "lucide-react"
+import { ChevronLeft, Loader2 } from "lucide-react"
 import { ChemistryTest } from "../chemistry/chemistry-test"
+import { api } from "@/lib/api-client"
+import { toast } from "sonner"
 
 export function ChemistryTestScreen() {
-    const { setCurrentScreen } = useApp()
+    const { setCurrentScreen, matchedUser } = useApp()
     const [isTestActive, setIsTestActive] = useState(false)
     const [testResult, setTestResult] = useState<any>(null)
+    const [testId, setTestId] = useState<string | null>(null)
+    const [isCalculating, setIsCalculating] = useState(false)
 
-    const handleComplete = (avgHeartRate: number) => {
+    const handleStartDemo = async () => {
+        setIsCalculating(true)
+        try {
+            // For demo purposes, we use a fixed target or mock if no match selected
+            const targetId = matchedUser?.id || "demo-target"
+            const matchId = "demo-match"
+            const res = await api.chemistry.startTest(matchId, targetId)
+            setTestId(res.test_id)
+            setIsTestActive(true)
+        } catch (e) {
+            toast.error("Failed to initialize chemistry protocol")
+        } finally {
+            setIsCalculating(false)
+        }
+    }
+
+    const handleComplete = async (avgHeartRate: number) => {
         setIsTestActive(false)
-        // Mock result for demo
-        setTestResult({
-            user_a_avg_hr: avgHeartRate,
-            user_b_avg_hr: 78,
-            sync_score: 82,
-            chemistry_detected: true,
-        })
+        setIsCalculating(true)
+
+        try {
+            if (testId) {
+                // Submit real data
+                await api.chemistry.submitData(testId, [
+                    { timestamp: Date.now(), bpm: avgHeartRate }
+                ])
+
+                // Get results
+                const result = await api.chemistry.getResults(testId)
+                setTestResult(result)
+            } else {
+                throw new Error("Test ID missing");
+            }
+        } catch (e) {
+            toast.error("Biometric analysis interrupted")
+        } finally {
+            setIsCalculating(false)
+        }
     }
 
     return (

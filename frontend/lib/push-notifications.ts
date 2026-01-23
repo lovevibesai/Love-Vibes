@@ -1,6 +1,9 @@
 // Push Notifications Service Worker Registration
 // This file handles Web Push notification subscription and management
 
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://love-vibes-backend.thelovevibes-ai.workers.dev';
+
 export async function registerServiceWorker() {
     if ('serviceWorker' in navigator && 'PushManager' in window) {
         try {
@@ -31,14 +34,18 @@ export async function subscribeToPushNotifications(userId: string) {
 
             subscription = await registration.pushManager.subscribe({
                 userVisibleOnly: true,
-                applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
+                applicationServerKey: urlBase64ToUint8Array(vapidPublicKey) as any,
             })
         }
 
         // Send subscription to backend
-        const response = await fetch('/api/notifications/subscribe', {
+        const token = localStorage.getItem('auth_token');
+        const response = await fetch(`${API_URL}/v2/notifications/subscribe`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json',
+                ...(token ? { 'X-Auth-Token': token } : {})
+            },
             body: JSON.stringify({
                 user_id: userId,
                 subscription: subscription.toJSON(),

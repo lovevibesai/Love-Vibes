@@ -50,8 +50,18 @@ export function DevToolbar() {
   const [isOpen, setIsOpen] = useState(false)
   const { currentScreen, setCurrentScreen, setIsOnboarded, isOnboarded } = useApp()
 
+  const forceUnlock = () => {
+    setIsOnboarded(true)
+    localStorage.setItem('is_onboarded', 'true')
+    localStorage.setItem('current_screen', 'feed')
+    setCurrentScreen('feed')
+    setIsOpen(false)
+  }
+
   const handleScreenChange = (screen: AppScreen, isOnboarding: boolean) => {
     setIsOnboarded(!isOnboarding)
+    localStorage.setItem('is_onboarded', (!isOnboarding).toString());
+    localStorage.setItem('current_screen', screen);
     setCurrentScreen(screen)
     setIsOpen(false)
   }
@@ -122,13 +132,22 @@ export function DevToolbar() {
                       <p className="text-[9px] font-black text-[#D4AF37] uppercase tracking-[0.2em]">Platform Control Center</p>
                     </div>
                   </div>
-                  <motion.button
-                    whileTap={{ scale: 0.9 }}
-                    onClick={() => setIsOpen(false)}
-                    className="h-12 w-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-white/40 hover:text-white transition-colors"
-                  >
-                    <X className="h-6 w-6" />
-                  </motion.button>
+
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={forceUnlock}
+                      className="px-4 py-2 rounded-xl bg-[#D4AF37] text-black font-black uppercase tracking-widest text-[9px] hover:bg-[#D4AF37]/90 transition-all shadow-lg"
+                    >
+                      Force Unlock Features
+                    </button>
+                    <motion.button
+                      whileTap={{ scale: 0.9 }}
+                      onClick={() => setIsOpen(false)}
+                      className="h-12 w-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-white/40 hover:text-white transition-colors"
+                    >
+                      <X className="h-6 w-6" />
+                    </motion.button>
+                  </div>
                 </div>
 
                 {/* Status Card - Holographic */}

@@ -3,9 +3,11 @@
 import { useState, useEffect } from "react"
 import { useApp } from "@/lib/app-context"
 import { Button } from "@/components/ui/button"
-import { ChevronLeft, Play, Heart, X, Volume2, Sparkles } from "lucide-react"
+import { ChevronLeft, Play, Heart, X, Volume2, Sparkles, Loader2 } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { VoiceRecorder } from "./voice-recorder"
+import { api } from "@/lib/api-client"
+import { toast } from "sonner"
 
 interface VoiceProfile {
     user_id: string
@@ -15,40 +17,80 @@ interface VoiceProfile {
 }
 
 export function VoiceFeedScreen() {
-    const { setCurrentScreen, user } = useApp()
+    const { setCurrentScreen } = useApp()
     const [profiles, setProfiles] = useState<VoiceProfile[]>([])
     const [currentIndex, setCurrentIndex] = useState(0)
     const [isPlaying, setIsPlaying] = useState(false)
     const [showRecorder, setShowRecorder] = useState(false)
     const [hasVoiceProfile, setHasVoiceProfile] = useState(false)
+    const [isLoading, setIsLoading] = useState(true)
+    const [isSwiping, setIsSwiping] = useState(false)
 
     useEffect(() => {
         loadVoiceFeed()
     }, [])
 
     const loadVoiceFeed = async () => {
-        // TODO: Load from API
-        // Mock data for now
-        setProfiles([
-            { user_id: "1", voice_url: "", duration: 28, overall_score: 85 },
-            { user_id: "2", voice_url: "", duration: 30, overall_score: 92 },
-        ])
+        setIsLoading(true)
+        try {
+            const data = await api.voice.getFeed()
+            setProfiles(data || [])
+            // If the user has a voice profile, the feed will be returned. 
+            // If the API returns 404 or similar because they haven't uploaded yet, 
+            // we handle that by showing the "Depth First" intro.
+            if (data && data.length > 0) {
+                setHasVoiceProfile(true)
+            }
+        } catch (e) {
+            console.error("Failed to load voice feed", e)
+        } finally {
+            setIsLoading(false)
+        }
     }
 
-    const handleSwipe = (action: 'like' | 'pass') => {
-        if (currentIndex < profiles.length - 1) {
-            setCurrentIndex(currentIndex + 1)
-            setIsPlaying(false)
-        } else {
-            // No more profiles
-            setCurrentScreen("feed")
+    const handleSwipe = async (action: 'LIKE' | 'PASS') => {
+        if (isSwiping) return
+
+        const targetId = profiles[currentIndex]?.user_id
+        if (!targetId) return
+
+        setIsSwiping(true)
+        try {
+            const res = await api.voice.swipe(targetId, action)
+            if (res.mutual_match) {
+                toast.success("Mutual voice match! Photos unlocked! 🔥")
+                // Possibly redirect to chat or show match modal
+            }
+
+            if (currentIndex < profiles.length - 1) {
+                setCurrentIndex(currentIndex + 1)
+                setIsPlaying(false)
+            } else {
+                toast.info("No more voice profiles for now.")
+                setCurrentScreen("feed")
+            }
+        } catch (e) {
+            toast.error("Failed to record response")
+        } finally {
+            setIsSwiping(false)
         }
     }
 
     const handleRecordingComplete = async (audioBlob: Blob, duration: number) => {
-        // TODO: Upload to backend
-        setHasVoiceProfile(true)
-        setShowRecorder(false)
+        setIsLoading(true)
+        try {
+            // Convert Blob to File for upload
+            const file = new File([audioBlob], `voice-intro-${Date.now()}.webm`, { type: 'audio/webm' })
+            await api.voice.uploadProfile(file)
+            setHasVoiceProfile(true)
+            setShowRecorder(false)
+            toast.success("Voice profile uploaded!")
+            loadVoiceFeed()
+        } catch (e) {
+            toast.error("Failed to upload voice profile")
+        } finally {
+            setIsLoading(false)
+        }
     }
 
     if (!hasVoiceProfile && !showRecorder) {
@@ -198,25 +240,22 @@ export function VoiceFeedScreen() {
                             </p>
                         </div>
 
-                        {/* Action Buttons */}
-                        <div className="flex items-center justify-center gap-4">
-                            <Button
-                                onClick={() => handleSwipe('pass')}
-                                variant="outline"
-                                size="lg"
-                                className="w-16 h-16 rounded-full border-2 border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
-                            >
-                                <X className="w-7 h-7" />
-                            </Button>
+                        <Button
+                            onClick={() => handleSwipe('PASS')}
+                            variant="outline"
+                            size="lg"
+                            className="w-16 h-16 rounded-full border-2 border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
+                        >
+                            <X className="w-7 h-7" />
+                        </Button>
 
-                            <Button
-                                onClick={() => handleSwipe('like')}
-                                size="lg"
-                                className="w-16 h-16 rounded-full bg-primary hover:bg-primary/90 text-primary-foreground"
-                            >
-                                <Heart className="w-7 h-7 fill-current" />
-                            </Button>
-                        </div>
+                        <Button
+                            onClick={() => handleSwipe('LIKE')}
+                            size="lg"
+                            className="w-16 h-16 rounded-full bg-primary hover:bg-primary/90 text-primary-foreground"
+                        >
+                            <Heart className="w-7 h-7 fill-current" />
+                        </Button>
                     </motion.div>
                 </AnimatePresence>
             </div>

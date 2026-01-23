@@ -4,6 +4,8 @@ import { useState, useRef, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { X, ShieldCheck, Camera, Check, AlertCircle, RefreshCcw, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { api } from "@/lib/api-client"
+import { useApp } from "@/lib/app-context"
 
 interface VerificationModalProps {
     isOpen: boolean
@@ -12,6 +14,7 @@ interface VerificationModalProps {
 }
 
 export function VerificationModal({ isOpen, onClose, onSuccess }: VerificationModalProps) {
+    const { user, updateUser } = useApp()
     const [step, setStep] = useState<"intro" | "camera" | "verification" | "success">("intro")
     const [stream, setStream] = useState<MediaStream | null>(null)
     const [capturedImage, setCapturedImage] = useState<string | null>(null)
@@ -35,6 +38,25 @@ export function VerificationModal({ isOpen, onClose, onSuccess }: VerificationMo
     const startCamera = async () => {
         try {
             setError(null)
+
+            // Check if we are on a native platform
+            const isNative = typeof window !== 'undefined' && (window as any).Capacitor?.isNative;
+
+            if (isNative) {
+                const { Camera, CameraResultType } = await import('@capacitor/camera')
+                const image = await Camera.getPhoto({
+                    quality: 90,
+                    allowEditing: false,
+                    resultType: CameraResultType.DataUrl
+                });
+                if (image.dataUrl) {
+                    setCapturedImage(image.dataUrl)
+                    setStep("verification")
+                }
+                return;
+            }
+
+            // Web Fallback
             const mediaStream = await navigator.mediaDevices.getUserMedia({
                 video: { facingMode: "user" },
                 audio: false
@@ -56,7 +78,7 @@ export function VerificationModal({ isOpen, onClose, onSuccess }: VerificationMo
         }
     }
 
-    const capturePhoto = () => {
+    const capturePhoto = async () => {
         if (videoRef.current && canvasRef.current) {
             const video = videoRef.current
             const canvas = canvasRef.current
@@ -68,6 +90,19 @@ export function VerificationModal({ isOpen, onClose, onSuccess }: VerificationMo
                 const dataUrl = canvas.toDataURL("image/jpeg")
                 setCapturedImage(dataUrl)
                 setStep("verification")
+
+                // Real Upload
+                try {
+                    const blob = await (await fetch(dataUrl)).blob()
+                    const file = new File([blob], "verification.jpg", { type: 'image/jpeg' })
+                    await api.media.upload(file, 'photo')
+                    await updateUser({ verificationStatus: 'verified', isVerified: true })
+                    setStep("success")
+                } catch (err) {
+                    console.error("Verification upload failed", err)
+                    setError("Upload failed. Please try again.")
+                    setStep("camera")
+                }
             }
         }
     }

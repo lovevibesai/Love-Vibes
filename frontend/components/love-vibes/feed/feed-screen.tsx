@@ -1,17 +1,17 @@
-"use client"
-
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { motion, AnimatePresence } from "framer-motion"
 import Image from "next/image"
-import { X, Heart, RefreshCw, SlidersHorizontal, RotateCcw } from "lucide-react"
+import { MapScreen } from "./map-screen"
+import { X, Heart, RefreshCw, SlidersHorizontal, RotateCcw, Map as MapIcon } from "lucide-react"
 import { SwipeCard } from "./swipe-card"
 import { MatchModal } from "./match-modal"
 import { ExpandedProfile } from "./expanded-profile"
-import { useApp, mockUsers, type User } from "@/lib/app-context"
+import { useApp, type User } from "@/lib/app-context"
 import { cn } from "@/lib/utils"
 import { api } from "@/lib/api-client"
-import { useEffect } from "react"
 import { ProximityAlert } from "../proximity/proximity-alert"
 import { EliteGuidance } from "../ui/elite-guidance"
+import { playSound } from "@/lib/sounds"
 
 export function FeedScreen() {
   const { mode, setShowMatchModal, setMatchedUser, showMatchModal, matchedUser, setCurrentScreen, loadFeed } = useApp()
@@ -21,6 +21,7 @@ export function FeedScreen() {
   const [expandedUser, setExpandedUser] = useState<User | null>(null)
   const [showProximityAlert, setShowProximityAlert] = useState(false)
   const [proximityMatch, setProximityMatch] = useState<User | null>(null)
+  const [showMap, setShowMap] = useState(false)
 
   useEffect(() => {
     const fetchFeed = async () => {
@@ -28,7 +29,7 @@ export function FeedScreen() {
       try {
         // In a real app, we'd get actual coords. For now, using default SF coords.
         const results = await loadFeed(37.7749, -122.4194)
-        if (results) {
+        if (results && results.length > 0) {
           // Transform backend schema to frontend User type if needed
           const mappedResults = results.map((u: any) => ({
             ...u,
@@ -37,9 +38,12 @@ export function FeedScreen() {
             photos: u.photo_urls ? JSON.parse(u.photo_urls) : [],
           }))
           setCards(mappedResults)
+        } else {
+          setCards([]) // Production: Show empty state if no recs
         }
       } catch (e) {
         console.error("Feed fetch error:", e)
+        setCards([])
       } finally {
         setLoading(false)
       }
@@ -52,11 +56,13 @@ export function FeedScreen() {
 
   const handleSwipe = async (userId: string, direction: "left" | "right") => {
     setSwipedCards((prev) => [...prev, userId])
+    playSound("swipe")
 
     try {
       if (direction === "right") {
         const res = await api.actions.like(userId)
         if (res.data?.match?.is_match) {
+          playSound("match")
           const matchedUserInfo = cards.find((c) => c.id === userId)
           if (matchedUserInfo) {
             setMatchedUser(matchedUserInfo)
@@ -82,10 +88,22 @@ export function FeedScreen() {
   }
 
   return (
-    <div className="flex flex-col h-full bg-background">
+    <div className="flex flex-col h-full bg-background relative">
       {/* Header */}
       <header className="flex items-center justify-between px-4 pt-4 pb-2">
-        <div className="w-10" />
+        <div className="w-10">
+          {/* Map Toggle Left */}
+          <button
+            onClick={() => setShowMap(!showMap)}
+            className={cn(
+              "w-10 h-10 rounded-full flex items-center justify-center transition-all",
+              showMap ? "bg-[#D4AF37] text-[#1A0814]" : "bg-card shadow-card hover:bg-muted text-foreground"
+            )}
+            aria-label="Map"
+          >
+            <MapIcon className="w-5 h-5" />
+          </button>
+        </div>
         <div className="flex items-center gap-2">
           <Image
             src="/logo.png"
@@ -113,6 +131,20 @@ export function FeedScreen() {
           </button>
         </div>
       </header>
+
+      {/* Map Screen Overlay */}
+      <AnimatePresence>
+        {showMap && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            className="absolute inset-0 z-40"
+          >
+            <MapScreen onClose={() => setShowMap(false)} />
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Card Stack */}
       <div className="flex-1 relative px-2 py-4">

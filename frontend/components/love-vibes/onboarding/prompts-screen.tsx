@@ -58,23 +58,38 @@ export function PromptsScreen() {
 
     if (loading) {
         return (
-            <div className="min-h-screen bg-[#F6EDEE] dark:bg-[#1A0814] flex items-center justify-center">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+            <div className="min-h-screen bg-[#1A0814] flex items-center justify-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#D4AF37]"></div>
             </div>
         )
     }
 
     return (
-        <div className="min-h-screen bg-[#F6EDEE] dark:bg-[#1A0814] overflow-y-auto relative flex flex-col items-center">
-            <div className="w-full max-w-md min-h-screen relative flex flex-col bg-[#F6EDEE] dark:bg-[#1A0814] text-[#2A0D1F] dark:text-[#F6EDEE] shadow-2xl">
+        <div className="min-h-screen bg-[#1A0814] overflow-y-auto relative flex flex-col items-center custom-scrollbar">
+            <style jsx global>{`
+                .custom-scrollbar::-webkit-scrollbar {
+                    width: 6px;
+                }
+                .custom-scrollbar::-webkit-scrollbar-track {
+                    background: rgba(255, 255, 255, 0.05);
+                }
+                .custom-scrollbar::-webkit-scrollbar-thumb {
+                    background: rgba(212, 175, 55, 0.5);
+                    border-radius: 10px;
+                }
+                .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+                    background: rgba(212, 175, 55, 0.8);
+                }
+            `}</style>
+            <div className="w-full max-w-md min-h-screen relative flex flex-col bg-[#1A0814] text-[#F6EDEE] shadow-2xl">
                 {/* Header */}
-                <div className="sticky top-0 z-10 bg-gradient-to-b from-[#F6EDEE] dark:from-[#1A0814] to-transparent backdrop-blur-sm">
+                <div className="sticky top-0 z-10 bg-gradient-to-b from-[#1A0814] to-transparent backdrop-blur-sm">
                     <div className="flex items-center justify-between p-4">
                         <button onClick={() => setCurrentScreen("profile-setup")} className="p-2 hover:bg-black/5 dark:hover:bg-white/10 rounded-full transition-colors">
-                            <ArrowLeft className="w-6 h-6" />
+                            <ArrowLeft className="w-6 h-6 text-white" />
                         </button>
-                        <div className="text-sm font-medium opacity-60">Step 2 of 3</div>
-                        <button onClick={handleSkip} className="text-sm font-medium text-primary hover:underline">
+                        <div className="text-sm font-medium text-white/60">Step 2 of 3</div>
+                        <button onClick={handleSkip} className="text-sm font-bold text-[#D4AF37] hover:text-[#D4AF37]/80 uppercase tracking-widest">
                             Skip
                         </button>
                     </div>

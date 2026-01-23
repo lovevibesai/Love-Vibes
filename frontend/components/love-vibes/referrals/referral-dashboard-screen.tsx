@@ -37,10 +37,7 @@ interface ReferralStats {
     }>
 }
 
-const RECENT_ENDORSEMENTS = [
-    { id: 1, name: "Jessica T.", type: "Authentic Vibe", color: "#D4AF37" },
-    { id: 2, name: "Marcus L.", type: "High Frequency", color: "#7A1F3D" },
-]
+const RECENT_ENDORSEMENTS: any[] = []
 
 export function ReferralDashboardScreen() {
     const { setCurrentScreen, user } = useApp()
@@ -60,14 +57,8 @@ export function ReferralDashboardScreen() {
             setStats(data)
         } catch (error) {
             console.error("Failed to load referral stats:", error)
-            // Fallback for demo if API fails
-            setStats({
-                referral_code: "AURORA-99", // Fallback
-                total_referrals: 0,
-                successful_signups: 0,
-                available_keys: 0,
-                referrals: [],
-            })
+            toast.error("Failed to load your Circle. Please try again.")
+            setStats(null)
         }
     }
 
@@ -295,7 +286,7 @@ export function ReferralDashboardScreen() {
                                 onClick={handleCopyCode}
                                 className="relative px-6 py-3 rounded-full bg-[#D4AF37] text-[#1A0814] font-black uppercase tracking-widest text-xs shadow-lg hover:scale-105 transition-all active:scale-95 overflow-hidden group"
                             >
-                                <span className="relative z-10">{user?.referral_code}</span>
+                                <span className="relative z-10">{stats?.referral_code}</span>
                                 <span className="absolute inset-0 bg-gradient-to-r from-[#D4AF37] via-[#FFE082] to-[#D4AF37] opacity-0 group-hover:opacity-100 transition-opacity duration-500 animate-shimmer" />
                                 <span className="absolute inset-0 rounded-full border border-[#D4AF37]/50 opacity-0 group-hover:opacity-100 transition-opacity" />
                             </button>
@@ -428,7 +419,7 @@ export function ReferralDashboardScreen() {
                                 <div className="h-[1px] flex-1 bg-white/5" />
                             </div>
                             <div className="space-y-2">
-                                {RECENT_ENDORSEMENTS.map(en => (
+                                {RECENT_ENDORSEMENTS.length > 0 ? RECENT_ENDORSEMENTS.map((en: any) => (
                                     <div key={en.id} className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/5">
                                         <div className="flex items-center gap-3">
                                             <div className="w-8 h-8 rounded-full bg-white/10 border border-white/10 flex items-center justify-center text-[10px] font-black uppercase">
@@ -445,7 +436,11 @@ export function ReferralDashboardScreen() {
                                             <Star className="w-3 h-3 text-[#D4AF37] fill-[#D4AF37]" />
                                         </div>
                                     </div>
-                                ))}
+                                )) : (
+                                    <div className="text-center py-6 text-white/20 text-xs italic">
+                                        No endorsements yet. Share your vouch link!
+                                    </div>
+                                )}
                             </div>
                         </section>
                     </div>

@@ -1,10 +1,12 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useApp } from "@/lib/app-context"
 import { Button } from "@/components/ui/button"
-import { ChevronLeft, Clock, Users, Zap, Check } from "lucide-react"
+import { ChevronLeft, Clock, Users, Zap, Check, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { api } from "@/lib/api-client"
+import { toast } from "sonner"
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const TIME_SLOTS = [
@@ -23,6 +25,29 @@ export function VibeWindowsScreen() {
     const { setCurrentScreen } = useApp()
     const [selectedWindows, setSelectedWindows] = useState<VibeWindow[]>([])
     const [selectedDay, setSelectedDay] = useState<number | null>(null)
+    const [isLoading, setIsLoading] = useState(true)
+    const [isSaving, setIsSaving] = useState(false)
+
+    useEffect(() => {
+        const fetchWindows = async () => {
+            try {
+                const res = await api.vibeWindows.getStatus()
+                if (res.is_in_window || res.next_window || res.current_window) {
+                    // Logic to map current windows if returned in a list
+                    // For now, if the API returns current_window, we can add it to the list
+                }
+
+                // Fetching the actual list might need a separate GET if getStatus only gives status
+                // But let's assume getStatus or a future getList provides them.
+                // Assuming backend might have a list endpoint soon, or using getStatus for now.
+                setIsLoading(false)
+            } catch (e) {
+                console.error("Failed to fetch vibe windows", e)
+                setIsLoading(false)
+            }
+        }
+        fetchWindows()
+    }, [])
 
     const toggleWindow = (day: number, hour: number) => {
         const exists = selectedWindows.find(w => w.day === day && w.hour === hour)
@@ -45,9 +70,21 @@ export function VibeWindowsScreen() {
         return `${hour - 12}pm`
     }
 
-    const handleSave = () => {
-        // TODO: Save to backend via API
-        setCurrentScreen("settings")
+    const handleSave = async () => {
+        setIsSaving(true)
+        try {
+            const windows = selectedWindows.map(w => ({
+                day_of_week: w.day,
+                start_hour: w.hour
+            }))
+            await api.vibeWindows.setStatus(windows)
+            toast.success("Vibe windows updated!")
+            setCurrentScreen("settings")
+        } catch (e) {
+            toast.error("Failed to save vibe windows")
+        } finally {
+            setIsSaving(false)
+        }
     }
 
     const getDayName = (dayIndex: number) => {

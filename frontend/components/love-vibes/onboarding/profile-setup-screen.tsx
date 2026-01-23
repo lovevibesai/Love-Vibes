@@ -55,7 +55,7 @@ const RELATIONSHIP_GOALS = [
 ]
 
 export function ProfileSetupScreen() {
-  const { setCurrentScreen, setCurrentUser, mode } = useApp()
+  const { setCurrentScreen, updateUser, mode } = useApp()
 
   // Basic Info
   const [name, setName] = useState("")
@@ -84,7 +84,7 @@ export function ProfileSetupScreen() {
   const [uploadingIndex, setUploadingIndex] = useState<number | null>(null)
 
   const mainPhoto = photos[0]
-  const isValid = name.length >= 2 && age.length > 0 && gender !== "" && interestedIn !== "" && mainPhoto !== null
+  const isValid = name.length >= 3 && age.length > 0 && gender !== "" && interestedIn !== "" && mainPhoto !== null && bio.length >= 10
 
   const handlePhotoUpload = async (event: React.ChangeEvent<HTMLInputElement>, index: number) => {
     const file = event.target.files?.[0]
@@ -93,12 +93,15 @@ export function ProfileSetupScreen() {
     setUploadingIndex(index)
     try {
       const res = await api.media.upload(file)
+      if (!res.url) throw new Error("Invalid response from server")
+
       const newPhotos = [...photos]
       newPhotos[index] = res.url
       setPhotos(newPhotos)
+      toast.success("Identity asset secured")
     } catch (e) {
       console.error("Upload failed", e)
-      toast.error("Photo link failure: Protocol interrupted")
+      toast.error("Upload failed: Please try a smaller image or check connection")
     } finally {
       setUploadingIndex(null)
     }
@@ -157,12 +160,11 @@ export function ProfileSetupScreen() {
       exerciseFrequency: exercise,
       diet,
       pets,
-      mode: mode || "dating",
-      isOnboarded: true
+      mode: mode || "dating"
     }
 
     try {
-      await setCurrentUser({ ...updates, id: "self", trustScore: 0, isVerified: false, credits: 0 })
+      await updateUser(updates)
       setCurrentScreen("prompts")
     } catch (e) {
       toast.error("Sync error: Failed to commit persona data")
@@ -214,6 +216,13 @@ export function ProfileSetupScreen() {
         <div className="space-y-3">
           <h1 className="text-4xl font-black text-white tracking-tighter leading-none">Your Profile</h1>
           <p className="text-sm text-white/40 font-medium tracking-wide">Show the world who you are.</p>
+
+          <div className="mt-4 p-4 rounded-2xl bg-[#D4AF37]/5 border border-[#D4AF37]/20">
+            <p className="text-[10px] font-black text-[#D4AF37] uppercase tracking-widest mb-1">Elite Tip</p>
+            <p className="text-[11px] text-white/60 leading-relaxed font-medium">
+              A complete profile gains 4x more resonance in the <span className="text-white">Sovereign Feed</span>. Step 03 is the foundation of your digital signature.
+            </p>
+          </div>
         </div>
 
         {/* Photo Grid - Elite Styling */}
@@ -282,8 +291,11 @@ export function ProfileSetupScreen() {
               className="w-full bg-white/[0.03] border border-white/10 rounded-[24px] p-6 text-sm text-white font-medium placeholder:text-white/10 focus:border-[#D4AF37]/30 outline-none transition-all min-h-[120px] resize-none"
               maxLength={500}
             />
-            <div className="absolute bottom-4 right-4 text-[9px] font-black text-white/20 uppercase tracking-widest">
-              {bio.length} / 500
+            <div className={cn(
+              "absolute bottom-4 right-4 text-[9px] font-black uppercase tracking-widest transition-colors",
+              bio.length < 10 ? "text-rose-500" : "text-emerald-500"
+            )}>
+              {bio.length} / 500 {bio.length < 10 && "(Min 10)"}
             </div>
           </div>
         </EliteSection>

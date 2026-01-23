@@ -26,30 +26,20 @@ export function SuccessStoriesScreen() {
     }, [])
 
     const loadStories = async () => {
-        // TODO: Load from API
-        // Mock data
-        setStories([
+        // In a real app, this would load from the API
+        const SUCCESS_STORIES: SuccessStory[] = [
             {
-                id: "1",
-                user_a_name: "Sarah",
-                user_b_name: "Mike",
-                user_a_photo: "https://api.dicebear.com/7.x/avataaars/svg?seed=Sarah",
-                user_b_photo: "https://api.dicebear.com/7.x/avataaars/svg?seed=Mike",
-                story_text: "We matched on Love Vibes 6 months ago and instantly connected over our shared love of hiking. Our first date was a sunrise hike, and we've been inseparable ever since!",
+                id: "s1",
+                user_a_name: "Alex",
+                user_b_name: "Jordan",
+                user_a_photo: "https://api.dicebear.com/7.x/avataaars/svg?seed=Alex",
+                user_b_photo: "https://api.dicebear.com/7.x/avataaars/svg?seed=Jordan",
+                story_text: "We connected over our shared love for minimalist design and deep tech.",
                 relationship_length: "6 months",
                 created_at: Date.now(),
-            },
-            {
-                id: "2",
-                user_a_name: "Emma",
-                user_b_name: "James",
-                user_a_photo: "https://api.dicebear.com/7.x/avataaars/svg?seed=Emma",
-                user_b_photo: "https://api.dicebear.com/7.x/avataaars/svg?seed=James",
-                story_text: "The voice-first matching feature changed everything for us. I fell in love with his laugh before I even saw his face. We're now planning our wedding!",
-                relationship_length: "1 year",
-                created_at: Date.now(),
-            },
-        ])
+            }
+        ]
+        setStories(SUCCESS_STORIES)
     }
 
     const handleShare = () => {

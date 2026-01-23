@@ -20,30 +20,34 @@ import {
   ShieldCheck,
   X,
   Zap,
+  Sparkles,
 } from "lucide-react"
 import { TrustScore } from "../trust-score"
 import { cn } from "@/lib/utils"
 import { VerificationModal } from "../verification/verification-modal"
 
 export function ProfileScreen() {
-  const { currentUser, mode, setMode, matches, setCurrentScreen, setIsOnboarded, setCurrentUser } = useApp()
+  const { user, mode, setMode, matches, setCurrentScreen, setIsOnboarded, setUser } = useApp()
   const [isVerificationModalOpen, setIsVerificationModalOpen] = useState(false)
   const [showPreview, setShowPreview] = useState(false)
 
   const handleLogout = () => {
     setIsOnboarded(false)
+    localStorage.removeItem("is_onboarded")
+    localStorage.removeItem("auth_token")
     setCurrentScreen("welcome")
   }
 
-  const user = currentUser || {
-    name: "Alex",
-    age: 28,
-    photoUrl: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&q=80",
-    bio: "Coffee enthusiast and adventure seeker. Love hiking on weekends!",
-    trustScore: 72,
+  const profileUser = user || {
+    name: "Your Profile",
+    age: 0,
+    photoUrl: "",
+    bio: "Complete your profile to get started",
+    trustScore: 0,
     isVerified: false,
-    credits: 100,
+    credits: 0,
     videoUrl: null,
+    userLocation: "",
     mode: "dating" as const,
   }
 
@@ -68,6 +72,7 @@ export function ProfileScreen() {
           </motion.button>
           <motion.button
             whileTap={{ scale: 0.95 }}
+            onClick={() => setCurrentScreen("profile-setup")}
             className="w-10 h-10 rounded-2xl glass-elevated flex items-center justify-center"
             aria-label="Edit profile"
           >
@@ -77,8 +82,8 @@ export function ProfileScreen() {
       </div>
 
       {/* Profile Photo - Overlapping */}
-      <div className="px-6 -mt-16 relative z-20">
-        <div className="relative inline-block">
+      <div className="px-6 -mt-16 relative z-20 pointer-events-none">
+        <div className="relative inline-block pointer-events-auto">
           <motion.div
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
@@ -206,6 +211,69 @@ export function ProfileScreen() {
         </div>
       )}
 
+      {/* Elite Features Grid */}
+      <div className="px-6 mt-10">
+        <h2 className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] mb-4 text-center">
+          ELITE CAPABILITIES
+        </h2>
+        <div className="grid grid-cols-2 gap-4">
+          <motion.button
+            whileTap={{ scale: 0.98 }}
+            onClick={() => setCurrentScreen("innovative-features")}
+            className="bg-card/40 backdrop-blur-md border border-border/30 rounded-[32px] p-5 flex flex-col items-center gap-3 hover:bg-card transition-all group"
+          >
+            <div className="w-12 h-12 rounded-2xl bg-[#D4AF37]/10 flex items-center justify-center group-hover:bg-[#D4AF37]/20 transition-colors">
+              <Sparkles className="w-6 h-6 text-[#D4AF37]" />
+            </div>
+            <span className="text-[10px] font-black text-foreground uppercase tracking-widest">Innovative</span>
+          </motion.button>
+
+          <motion.button
+            whileTap={{ scale: 0.98 }}
+            onClick={() => setCurrentScreen("referral-dashboard")}
+            className="bg-card/40 backdrop-blur-md border border-border/30 rounded-[32px] p-5 flex flex-col items-center gap-3 hover:bg-card transition-all group"
+          >
+            <div className="w-12 h-12 rounded-2xl bg-[#D4AF37]/10 flex items-center justify-center group-hover:bg-[#D4AF37]/20 transition-colors">
+              <Users className="w-6 h-6 text-[#D4AF37]" />
+            </div>
+            <span className="text-[10px] font-black text-foreground uppercase tracking-widest">The Circle</span>
+          </motion.button>
+
+          <motion.button
+            whileTap={{ scale: 0.98 }}
+            onClick={() => setCurrentScreen("identity-signature")}
+            className="bg-card/40 backdrop-blur-md border border-border/30 rounded-[32px] p-5 flex flex-col items-center gap-3 hover:bg-card transition-all group"
+          >
+            <div className="w-12 h-12 rounded-2xl bg-[#7A1F3D]/10 flex items-center justify-center group-hover:bg-[#7A1F3D]/20 transition-colors">
+              <Zap className="w-6 h-6 text-[#7A1F3D]" />
+            </div>
+            <span className="text-[10px] font-black text-foreground uppercase tracking-widest">Signature</span>
+          </motion.button>
+
+          <motion.button
+            whileTap={{ scale: 0.98 }}
+            onClick={() => setCurrentScreen("chemistry-test")}
+            className="bg-card/40 backdrop-blur-md border border-border/30 rounded-[32px] p-5 flex flex-col items-center gap-3 hover:bg-card transition-all group"
+          >
+            <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
+              <Heart className="w-6 h-6 text-primary" />
+            </div>
+            <span className="text-[10px] font-black text-foreground uppercase tracking-widest">Chemistry</span>
+          </motion.button>
+
+          <motion.button
+            whileTap={{ scale: 0.98 }}
+            onClick={() => setCurrentScreen("vibe-windows")}
+            className="bg-card/40 backdrop-blur-md border border-border/30 rounded-[32px] p-5 flex flex-col items-center gap-3 hover:bg-card transition-all group"
+          >
+            <div className="w-12 h-12 rounded-2xl bg-blue-500/10 flex items-center justify-center group-hover:bg-blue-500/20 transition-colors">
+              <Eye className="w-6 h-6 text-blue-500" />
+            </div>
+            <span className="text-[10px] font-black text-foreground uppercase tracking-widest">Vibe Windows</span>
+          </motion.button>
+        </div>
+      </div>
+
       {/* Video Intro - Large Format */}
       <div className="px-6 mt-10">
         <h2 className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] mb-4 text-center">
@@ -213,6 +281,7 @@ export function ProfileScreen() {
         </h2>
         <motion.button
           whileTap={{ scale: 0.98 }}
+          onClick={() => setCurrentScreen("video")}
           className="w-full bg-card/60 backdrop-blur-xl border border-border/50 rounded-[32px] p-6 shadow-sm flex items-center gap-5 hover:bg-card transition-colors group"
         >
           <div className="w-20 h-20 rounded-2xl bg-muted/50 overflow-hidden relative flex items-center justify-center">
@@ -237,7 +306,7 @@ export function ProfileScreen() {
       {/* Settings List */}
       <div className="px-6 mt-10 pb-32">
         <div className="bg-card/40 backdrop-blur-md rounded-[32px] border border-border/30 overflow-hidden shadow-sm">
-          <SettingsItem icon={MapPin} label="Location" value="Dubai, UAE" onClick={() => setCurrentScreen("settings")} />
+          <SettingsItem icon={MapPin} label="Location" value={user.userLocation || "Location Not Set"} onClick={() => setCurrentScreen("settings")} />
           <SettingsItem icon={Eye} label="Visibility" value="All Members" onClick={() => setCurrentScreen("settings")} />
           <SettingsItem icon={LogOut} label="Log Out" color="destructive" onClick={handleLogout} />
         </div>
@@ -247,8 +316,8 @@ export function ProfileScreen() {
         isOpen={isVerificationModalOpen}
         onClose={() => setIsVerificationModalOpen(false)}
         onSuccess={() => {
-          if (currentUser) {
-            setCurrentUser({ ...currentUser, isVerified: true, trustScore: Math.min(100, (currentUser.trustScore || 0) + 20) })
+          if (profileUser) {
+            setUser({ ...user, isVerified: true, trustScore: Math.min(100, (user.trustScore || 0) + 20) })
           }
         }}
       />

@@ -36,10 +36,7 @@ import { IdentitySignatureScreen } from "./viral/identity-signature-screen"
 
 export function LoveVibesApp() {
   const { currentScreen, isOnboarded } = useApp()
-  const [showSplash, setShowSplash] = useState(() => {
-    // FORCE DISABLE SPLASH to resolve stuck state
-    return false;
-  })
+  const [showSplash, setShowSplash] = useState(true)
 
   // Show splash on first render
 
@@ -65,7 +62,7 @@ export function LoveVibesApp() {
   }
 
   // Main app screens with bottom navigation
-  const showBottomNav = ["feed", "matches", "profile"].includes(currentScreen)
+  const showBottomNav = ["feed", "matches", "profile", "innovative-features"].includes(currentScreen)
 
   return (
     <div className="h-screen flex flex-col max-w-md mx-auto">

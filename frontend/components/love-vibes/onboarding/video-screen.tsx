@@ -1,7 +1,8 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useApp } from "@/lib/app-context"
+import { api } from "@/lib/api-client"
 import { motion, AnimatePresence } from "framer-motion"
 import {
   ArrowLeft,
@@ -18,10 +19,14 @@ import {
 import { cn } from "@/lib/utils"
 
 export function VideoScreen() {
-  const { setCurrentScreen, currentUser, setCurrentUser } = useApp()
+  const { setCurrentScreen, user, updateUser } = useApp()
   const [isRecording, setIsRecording] = useState(false)
   const [recordingTime, setRecordingTime] = useState(15)
   const [hasRecorded, setHasRecorded] = useState(false)
+  const [videoBlob, setVideoBlob] = useState<Blob | null>(null)
+  const [isUploading, setIsUploading] = useState(false)
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const streamRef = useRef<MediaStream | null>(null)
 
   useEffect(() => {
     let timer: NodeJS.Timeout
@@ -30,33 +35,69 @@ export function VideoScreen() {
         setRecordingTime((t) => t - 1)
       }, 1000)
     } else if (recordingTime === 0) {
-      setIsRecording(false)
-      setHasRecorded(true)
+      handleStopRecording()
     }
     return () => clearInterval(timer)
   }, [isRecording, recordingTime])
 
-  const handleStartRecording = () => {
-    setIsRecording(true)
-    setRecordingTime(15)
+  const handleStartRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+      streamRef.current = stream
+      const mediaRecorder = new MediaRecorder(stream)
+      mediaRecorderRef.current = mediaRecorder
+
+      const chunks: Blob[] = []
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunks.push(e.data)
+      }
+
+      mediaRecorder.onstop = () => {
+        const blob = new Blob(chunks, { type: 'video/mp4' })
+        setVideoBlob(blob)
+        setHasRecorded(true)
+        stream.getTracks().forEach(track => track.stop())
+      }
+
+      mediaRecorder.start()
+      setIsRecording(true)
+      setRecordingTime(15)
+    } catch (err) {
+      console.error("Camera/Mic error:", err)
+      // Fallback or alert user
+    }
   }
 
   const handleStopRecording = () => {
-    setIsRecording(false)
-    setHasRecorded(true)
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop()
+      setIsRecording(false)
+    }
   }
 
-  const handleContinue = () => {
-    if (currentUser) {
-      setCurrentUser({
-        ...currentUser,
-        videoUrl: hasRecorded ? "https://example.com/video.mp4" : undefined,
-      })
+  const handleContinue = async () => {
+    if (hasRecorded && videoBlob) {
+      setIsUploading(true)
+      try {
+        const file = new File([videoBlob], "intro.mp4", { type: 'video/mp4' })
+        const res = await api.media.upload(file, 'video')
+        if (user) {
+          await updateUser({
+            videoUrl: res.url,
+            hasVideoIntro: true
+          })
+        }
+      } catch (err) {
+        console.error("Upload failed", err)
+      } finally {
+        setIsUploading(false)
+      }
     }
     setCurrentScreen("location")
   }
 
   const handleSkip = () => {
+    localStorage.setItem('current_screen', 'location');
     setCurrentScreen("location")
   }
 
@@ -128,6 +169,17 @@ export function VideoScreen() {
             className="absolute inset-0 rounded-[40px] bg-black/40 border-2 border-[#D4AF37]/30 overflow-hidden shadow-[0_30px_60px_-15px_rgba(0,0,0,0.8)]"
           >
             <div className="absolute inset-0 flex items-center justify-center">
+              {isRecording && (
+                <video
+                  ref={(ref) => {
+                    if (ref && streamRef.current) ref.srcObject = streamRef.current
+                  }}
+                  autoPlay
+                  playsInline
+                  muted
+                  className="absolute inset-0 w-full h-full object-cover scale-x-[-1]"
+                />
+              )}
               <AnimatePresence mode="wait">
                 {hasRecorded ? (
                   <motion.div
@@ -244,7 +296,7 @@ export function VideoScreen() {
             className="w-full h-18 rounded-[22px] bg-white text-[#1A0814] font-black uppercase tracking-[0.3em] text-sm shadow-[0_20px_50px_rgba(255,255,255,0.1)] flex items-center justify-center gap-4 relative overflow-hidden"
           >
             <Zap className="w-5 h-5 fill-current" />
-            {hasRecorded ? "Commit & Sync" : "Sync Without Asset"}
+            {isUploading ? "Transmitting..." : (hasRecorded ? "Commit & Sync" : "Sync Without Asset")}
             <motion.div
               className="absolute inset-0 bg-gradient-to-r from-transparent via-[#D4AF37]/30 to-transparent skew-x-[30deg]"
               animate={{ x: ['-200%', '200%'] }}

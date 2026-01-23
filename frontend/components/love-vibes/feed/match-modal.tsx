@@ -83,7 +83,7 @@ export function MatchModal({ user }: MatchModalProps) {
           <div className="relative">
             <div className="w-28 h-28 rounded-full border-4 border-white overflow-hidden shadow-modal">
               <img
-                src={currentUser?.photoUrl || "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&q=80"}
+                src={currentUser?.photoUrl || "/placeholder.svg"}
                 alt="You"
                 className="w-full h-full object-cover"
               />

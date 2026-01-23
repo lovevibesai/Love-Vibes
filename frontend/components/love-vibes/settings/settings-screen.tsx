@@ -2,7 +2,6 @@
 
 import { useState } from "react"
 import { useApp } from "@/lib/app-context"
-import { initializePushNotifications } from "@/lib/push-notifications"
 import { Button } from "@/components/ui/button"
 import { useTheme } from "next-themes"
 import { Switch } from "@/components/ui/switch"
@@ -13,19 +12,19 @@ import {
   Bell,
   Shield,
   User,
-  Users,
   LogOut,
   Trash2,
   ChevronRight,
   Lock,
   FileText,
   HelpCircle,
-  Clock,
 } from "lucide-react"
+import { api } from "@/lib/api-client"
 
 export function SettingsScreen() {
   const { setCurrentScreen, user, updateUser } = useApp()
   const { setTheme, resolvedTheme } = useTheme()
+  const [isUpdatingLocation, setIsUpdatingLocation] = useState(false)
   const [notifications, setNotifications] = useState({
     matches: true,
     messages: true,
@@ -37,6 +36,27 @@ export function SettingsScreen() {
   const handleLogout = () => {
     updateUser({ isOnboarded: false })
     setCurrentScreen("welcome")
+  }
+
+  const handleUpdateLocation = async () => {
+    setIsUpdatingLocation(true)
+    try {
+      const { Geolocation } = await import('@capacitor/geolocation')
+      const position = await Geolocation.getCurrentPosition()
+      const { latitude, longitude } = position.coords
+
+      await api.proximity.updateLocation(latitude, longitude)
+
+      const locationString = `Lat: ${latitude.toFixed(2)}, Lng: ${longitude.toFixed(2)}`
+      updateUser({ ...user, userLocation: locationString })
+
+      alert("Location updated successfully!")
+    } catch (err) {
+      console.error("Failed to update location:", err)
+      alert("Could not get location. Please check your permissions.")
+    } finally {
+      setIsUpdatingLocation(false)
+    }
   }
 
   return (
@@ -59,16 +79,21 @@ export function SettingsScreen() {
         <section className="p-4 border-b border-border">
           <h2 className="text-sm font-medium text-muted-foreground mb-3 uppercase tracking-wide">Location</h2>
           <button
-            className="w-full flex items-center justify-between p-4 bg-card rounded-xl shadow-card"
-            onClick={() => setCurrentScreen("location-settings")}
+            className="w-full flex items-center justify-between p-4 bg-card rounded-xl shadow-card disabled:opacity-50"
+            onClick={handleUpdateLocation}
+            disabled={isUpdatingLocation}
           >
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                <MapPin className="w-5 h-5 text-primary" />
+                {isUpdatingLocation ? (
+                  <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <MapPin className="w-5 h-5 text-primary" />
+                )}
               </div>
               <div className="text-left">
-                <p className="font-medium text-foreground">{user.userLocation || "San Francisco, CA"}</p>
-                <p className="text-sm text-muted-foreground">Tap to update</p>
+                <p className="font-medium text-foreground">{user?.userLocation || "Location Not Set"}</p>
+                <p className="text-sm text-muted-foreground">{isUpdatingLocation ? "Updating..." : "Tap to update"}</p>
               </div>
             </div>
             <ChevronRight className="w-5 h-5 text-muted-foreground" />

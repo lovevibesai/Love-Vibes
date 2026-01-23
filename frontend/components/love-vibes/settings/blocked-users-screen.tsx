@@ -30,7 +30,7 @@ const MOCK_BLOCKED_USERS: BlockedUser[] = [
 
 export function BlockedUsersScreen() {
     const { setCurrentScreen } = useApp()
-    const [blockedUsers, setBlockedUsers] = useState<BlockedUser[]>(MOCK_BLOCKED_USERS)
+    const [blockedUsers, setBlockedUsers] = useState<BlockedUser[]>([]) // Production: Start empty
     const [unblockingId, setUnblockingId] = useState<string | null>(null)
 
     const handleUnblock = (id: string) => {

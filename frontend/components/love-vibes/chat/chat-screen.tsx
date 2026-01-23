@@ -12,8 +12,9 @@ import { ChatMenu } from "./chat-menu"
 import { IcebreakerPanel } from "./icebreaker-panel"
 import { cn } from "@/lib/utils"
 import { api } from "@/lib/api-client"
+import { playSound } from "@/lib/sounds"
 
-const WS_URL = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8787';
+const WS_URL = process.env.NEXT_PUBLIC_WS_URL || 'wss://love-vibes-backend.thelovevibes-ai.workers.dev';
 
 interface Message {
   id: string
@@ -25,48 +26,7 @@ interface Message {
   giftName?: string
 }
 
-const mockMessages: Message[] = [
-  {
-    id: "1",
-    text: "Hey! I love your profile, especially the part about hiking!",
-    sender: "them",
-    timestamp: new Date(Date.now() - 1000 * 60 * 30),
-    read: true,
-    type: "text",
-  },
-  {
-    id: "2",
-    text: "Thanks! I try to hit the trails every weekend. Do you hike too?",
-    sender: "me",
-    timestamp: new Date(Date.now() - 1000 * 60 * 25),
-    read: true,
-    type: "text",
-  },
-  {
-    id: "3",
-    text: "Yes! I just did the Sunset Trail last week. The views were incredible!",
-    sender: "them",
-    timestamp: new Date(Date.now() - 1000 * 60 * 20),
-    read: true,
-    type: "text",
-  },
-  {
-    id: "4",
-    text: "That sounds amazing. We should go together sometime!",
-    sender: "me",
-    timestamp: new Date(Date.now() - 1000 * 60 * 15),
-    read: true,
-    type: "text",
-  },
-  {
-    id: "5",
-    text: "I'd love that! How about this Saturday?",
-    sender: "them",
-    timestamp: new Date(Date.now() - 1000 * 60 * 5),
-    read: false,
-    type: "text",
-  },
-]
+const mockMessages: Message[] = []
 
 function formatMessageTime(date: Date) {
   return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
@@ -83,8 +43,8 @@ function formatDateHeader(date: Date) {
 }
 
 export function ChatScreen() {
-  const { setCurrentScreen, matches } = useApp()
-  const [messages, setMessages] = useState<Message[]>(mockMessages)
+  const { setCurrentScreen, matches, user } = useApp()
+  const [messages, setMessages] = useState<Message[]>([]) // Production: Start with no messages
   const [inputValue, setInputValue] = useState("")
   const [showGiftSheet, setShowGiftSheet] = useState(false)
   const [showIcebreakers, setShowIcebreakers] = useState(messages.length === 0)
@@ -99,9 +59,9 @@ export function ChatScreen() {
   const chatRoomId = activeMatch?.chatRoomId
 
   useEffect(() => {
-    if (!chatRoomId) return;
+    if (!chatRoomId || !user?.id) return;
 
-    const socket = new WebSocket(`${WS_URL}/ws/chat?match_id=${chatRoomId}`);
+    const socket = new WebSocket(`${WS_URL}/ws/chat?match_id=${chatRoomId}&user_id=${user.id}`);
     socketRef.current = socket;
 
     socket.onopen = () => {
@@ -114,13 +74,14 @@ export function ChatScreen() {
       const incomingMsg: Message = {
         id: Math.random().toString(),
         text: data.text,
-        sender: data.sender_id === "self" ? "me" : "them",
+        sender: data.sender_id === user.id ? "me" : "them",
         timestamp: new Date(data.timestamp),
         read: false,
         type: data.type || "text",
         giftName: data.giftName,
       };
       setMessages(prev => [...prev, incomingMsg]);
+      playSound("message");
     };
 
     socket.onclose = () => {
@@ -148,6 +109,7 @@ export function ChatScreen() {
 
     socketRef.current.send(JSON.stringify(messagePayload))
     setInputValue("")
+    playSound("message")
   }
 
   const handleGiftSend = (giftName: string) => {

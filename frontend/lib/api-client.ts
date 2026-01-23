@@ -3,7 +3,7 @@
  * Connects Frontend to Cloudflare Backend
  */
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8787';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://love-vibes-backend.thelovevibes-ai.workers.dev';
 
 // Helper to get Token
 function getAuthToken(): string | null {
@@ -61,6 +61,33 @@ export const api = {
                 body: JSON.stringify({ email }),
             });
         },
+        // Google Login
+        loginGoogle: async (idToken: string) => {
+            const res = await apiRequest('/v2/auth/login/google', {
+                method: 'POST',
+                body: JSON.stringify({ id_token: idToken }),
+            });
+            if (res.token) {
+                localStorage.setItem('auth_token', res.token);
+                if (res.user?.id) localStorage.setItem('user_id', res.user.id);
+            }
+            return res;
+        },
+        // Passkey Login
+        getLoginOptions: async () => {
+            return apiRequest('/v2/auth/login/passkey/options');
+        },
+        verifyLoginPasskey: async (response: any) => {
+            const res = await apiRequest('/v2/auth/login/passkey/verify', {
+                method: 'POST',
+                body: JSON.stringify({ response }),
+            });
+            if (res.success && res.token) {
+                localStorage.setItem('auth_token', res.token);
+                if (res.user?.id) localStorage.setItem('user_id', res.user.id);
+            }
+            return res;
+        },
         verifyEmailOTP: async (email: string, otp: string) => {
             const res = await apiRequest('/v2/auth/login/email/verify', {
                 method: 'POST',
@@ -116,9 +143,117 @@ export const api = {
                 method: 'PUT',
                 body: JSON.stringify(data)
             })
+        },
+        getProfile: async () => {
+            return apiRequest('/user/profile');
         }
     },
-
+    vibeWindows: {
+        setStatus: async (windows: Array<{ day_of_week: number; start_hour: number }>) => {
+            return apiRequest('/v2/vibe-windows/set', {
+                method: 'POST',
+                body: JSON.stringify({ windows })
+            });
+        },
+        getStatus: async () => {
+            return apiRequest('/v2/vibe-windows/status');
+        }
+    },
+    chemistry: {
+        startTest: async (matchId: string, targetId: string) => {
+            return apiRequest('/v2/chemistry/start', {
+                method: 'POST',
+                body: JSON.stringify({ match_id: matchId, target_id: targetId })
+            });
+        },
+        submitData: async (testId: string, heartRateData: Array<{ timestamp: number; bpm: number }>) => {
+            return apiRequest('/v2/chemistry/submit', {
+                method: 'POST',
+                body: JSON.stringify({ test_id: testId, heart_rate_data: heartRateData })
+            });
+        },
+        getResults: async (testId: string) => {
+            return apiRequest(`/v2/chemistry/results/${testId}`);
+        }
+    },
+    voice: {
+        uploadProfile: async (file: File) => {
+            const formData = new FormData();
+            formData.append('file', file);
+            const token = getAuthToken();
+            const response = await fetch(`${API_URL}/v2/voice/upload`, {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    ...(token ? { 'X-Auth-Token': token } : {}),
+                }
+            });
+            return response.json();
+        },
+        getFeed: async () => {
+            return apiRequest('/v2/voice/feed');
+        },
+        swipe: async (targetId: string, action: 'LIKE' | 'PASS') => {
+            return apiRequest('/v2/voice/swipe', {
+                method: 'POST',
+                body: JSON.stringify({ target_id: targetId, action })
+            });
+        }
+    },
+    proximity: {
+        toggle: async (enabled: boolean) => {
+            return apiRequest('/v2/proximity/enable', {
+                method: 'POST',
+                body: JSON.stringify({ enabled })
+            });
+        },
+        updateLocation: async (lat: number, long: number) => {
+            return apiRequest('/v2/proximity/update', {
+                method: 'POST',
+                body: JSON.stringify({ lat, long })
+            });
+        },
+        respond: async (alertId: string, response: 'accepted' | 'declined') => {
+            return apiRequest('/v2/proximity/respond', {
+                method: 'POST',
+                body: JSON.stringify({ alert_id: alertId, response })
+            });
+        }
+    },
+    boost: {
+        activate: async (durationMinutes: number = 30) => {
+            return apiRequest('/v2/boost/activate', {
+                method: 'POST',
+                body: JSON.stringify({ duration_minutes: durationMinutes })
+            });
+        },
+        getStatus: async () => {
+            return apiRequest('/v2/boost/status');
+        }
+    },
+    social: {
+        importContacts: async (contacts: Array<{ phone: string; name: string }>) => {
+            return apiRequest('/v2/social/import', {
+                method: 'POST',
+                body: JSON.stringify({ contacts })
+            });
+        },
+        getMutualFriends: async (targetId: string) => {
+            return apiRequest(`/v2/social/mutual/${targetId}`);
+        },
+        requestIntro: async (targetId: string, mutualFriendId: string) => {
+            return apiRequest('/v2/social/request-intro', {
+                method: 'POST',
+                body: JSON.stringify({ target_id: targetId, mutual_friend_id: mutualFriendId })
+            });
+        },
+        respondIntro: async (requestId: string, response: 'approved' | 'declined', message?: string) => {
+            return apiRequest('/v2/social/respond-intro', {
+                method: 'POST',
+                body: JSON.stringify({ request_id: requestId, response, message })
+            });
+        }
+    },
     safety: {
         reportUser: async (reportedId: string, reason: string, details: string) => {
             return apiRequest('/v2/safety/report', {
@@ -139,7 +274,6 @@ export const api = {
             });
         }
     },
-
     billing: {
         purchaseCredits: async (packageId: string) => {
             return apiRequest('/v2/billing/purchase-credits', {

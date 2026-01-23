@@ -55,39 +55,42 @@ export function PromptSelection({ prompts, onComplete }: PromptSelectionProps) {
         return (
             <div className="space-y-6">
                 <div className="text-center">
-                    <h2 className="text-2xl font-serif font-bold text-foreground mb-2">
+                    <h2 className="text-2xl font-serif font-bold text-white mb-2">
                         Choose Your Prompts
                     </h2>
-                    <p className="text-muted-foreground">
+                    <p className="text-white/70">
                         Select 3 prompts to showcase your personality ({selectedPrompts.length}/3)
                     </p>
                 </div>
 
                 <div className="grid grid-cols-1 gap-3">
-                    {prompts.map((prompt) => (
-                        <button
-                            key={prompt.id}
-                            onClick={() => handlePromptToggle(prompt.id)}
-                            className={cn(
-                                "w-full p-4 rounded-2xl border-2 text-left transition-all",
-                                selectedPrompts.includes(prompt.id)
-                                    ? "border-primary bg-primary/5"
-                                    : "border-border bg-card hover:border-primary/50"
-                            )}
-                        >
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="font-medium text-foreground">{prompt.prompt_text}</p>
-                                    <p className="text-xs text-muted-foreground capitalize mt-1">{prompt.category}</p>
-                                </div>
-                                {selectedPrompts.includes(prompt.id) && (
-                                    <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center">
-                                        <Check className="w-4 h-4 text-white" />
-                                    </div>
+                    {prompts.map((prompt) => {
+                        const isSelected = selectedPrompts.includes(prompt.id)
+                        return (
+                            <button
+                                key={prompt.id}
+                                onClick={() => handlePromptToggle(prompt.id)}
+                                className={cn(
+                                    "w-full p-4 rounded-2xl border-2 text-left transition-all",
+                                    isSelected
+                                        ? "border-primary bg-primary/20"
+                                        : "border-white/10 bg-white/5 hover:border-primary/50"
                                 )}
-                            </div>
-                        </button>
-                    ))}
+                            >
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <p className={cn("font-medium", isSelected ? "text-white" : "text-white/70")}>{prompt.prompt_text}</p>
+                                        <p className="text-xs text-white/40 capitalize mt-1">{prompt.category}</p>
+                                    </div>
+                                    {isSelected && (
+                                        <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center">
+                                            <Check className="w-4 h-4 text-white" />
+                                        </div>
+                                    )}
+                                </div>
+                            </button>
+                        )
+                    })}
                 </div>
 
                 <Button
@@ -104,10 +107,10 @@ export function PromptSelection({ prompts, onComplete }: PromptSelectionProps) {
     return (
         <div className="space-y-6">
             <div className="text-center">
-                <h2 className="text-2xl font-serif font-bold text-foreground mb-2">
+                <h2 className="text-2xl font-serif font-bold text-white mb-2">
                     Share Your Answers
                 </h2>
-                <p className="text-muted-foreground">
+                <p className="text-white/70">
                     Write responses that show who you are
                 </p>
             </div>
@@ -119,15 +122,15 @@ export function PromptSelection({ prompts, onComplete }: PromptSelectionProps) {
 
                     return (
                         <div key={promptId} className="space-y-2">
-                            <label className="font-medium text-foreground">{prompt.prompt_text}</label>
+                            <label className="font-medium text-white">{prompt.prompt_text}</label>
                             <Textarea
                                 value={responses[promptId] || ''}
                                 onChange={(e) => handleResponseChange(promptId, e.target.value)}
                                 placeholder="Share your answer..."
-                                className="min-h-[100px] resize-none"
+                                className="min-h-[100px] resize-none bg-white/5 border-white/10 text-white placeholder:text-white/20"
                                 maxLength={150}
                             />
-                            <p className="text-xs text-muted-foreground text-right">
+                            <p className="text-xs text-white/40 text-right">
                                 {responses[promptId]?.length || 0}/150
                             </p>
                         </div>
@@ -138,7 +141,7 @@ export function PromptSelection({ prompts, onComplete }: PromptSelectionProps) {
             <div className="flex gap-3">
                 <Button
                     variant="outline"
-                    className="flex-1 h-14 rounded-2xl"
+                    className="flex-1 h-14 rounded-2xl border-white/10 text-white hover:bg-white/10 hover:text-white"
                     onClick={() => setCurrentStep('select')}
                 >
                     Back

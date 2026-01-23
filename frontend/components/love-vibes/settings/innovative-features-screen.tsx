@@ -17,6 +17,13 @@ export function InnovativeFeaturesScreen() {
 
     const features = [
         {
+            id: "referral-dashboard",
+            title: "The Resonance Circle",
+            subtitle: "Exclusive community & rewards",
+            icon: <Users className="w-5 h-5 text-[#D4AF37]" />,
+            tag: "Circle"
+        },
+        {
             id: "identity-signature",
             title: "The Elite Signature",
             subtitle: "AI status validation card",

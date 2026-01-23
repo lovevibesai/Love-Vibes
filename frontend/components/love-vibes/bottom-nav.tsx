@@ -1,12 +1,13 @@
 "use client"
 
-import { Heart, MessageCircle, User } from "lucide-react"
+import { Heart, MessageCircle, User, Star } from "lucide-react"
 import { useApp, type AppScreen } from "@/lib/app-context"
 import { cn } from "@/lib/utils"
 
-const navItems: { icon: typeof Heart; label: string; screen: AppScreen }[] = [
+const navItems: { icon: any; label: string; screen: AppScreen }[] = [
   { icon: Heart, label: "Discover", screen: "feed" },
   { icon: MessageCircle, label: "Matches", screen: "matches" },
+  { icon: Star, label: "Elite", screen: "innovative-features" },
   { icon: User, label: "Profile", screen: "profile" },
 ]
 
@@ -19,7 +20,7 @@ export function BottomNav() {
         {navItems.map((item) => {
           const isActive = currentScreen === item.screen
           const Icon = item.icon
-          
+
           return (
             <button
               key={item.screen}
@@ -32,11 +33,11 @@ export function BottomNav() {
               aria-label={item.label}
               aria-current={isActive ? "page" : undefined}
             >
-              <Icon 
+              <Icon
                 className={cn(
                   "w-6 h-6 transition-transform",
                   isActive && "scale-110"
-                )} 
+                )}
                 fill={isActive ? "currentColor" : "none"}
               />
               <span className="text-xs mt-1 font-medium">{item.label}</span>
