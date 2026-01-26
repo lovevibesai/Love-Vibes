@@ -3,6 +3,8 @@ import type { Metadata, Viewport } from 'next'
 import { Inter, Playfair_Display } from 'next/font/google'
 import { ThemeProvider } from "@/components/theme-provider"
 import { FirebaseInit } from "@/components/firebase-init"
+import { Toaster } from "@/components/ui/toaster"
+import { Toaster as SonnerToaster } from "sonner"
 import './globals.css'
 
 const inter = Inter({
@@ -62,6 +64,8 @@ export default function RootLayout({
             <main className="w-full max-w-md h-[100dvh] relative overflow-hidden bg-background shadow-2xl">
               {children}
             </main>
+            <Toaster />
+            <SonnerToaster position="top-center" expand={false} richColors />
           </div>
         </ThemeProvider>
       </body>
