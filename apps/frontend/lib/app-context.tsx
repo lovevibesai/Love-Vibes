@@ -264,6 +264,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
         console.log("[Passkey] Options:", options);
       }
 
+      // Check if options are valid
+      if (!options || options.error) {
+        throw new Error(options?.error || "Unable to get passkey options");
+      }
+
       const authResp = await startAuthentication(options);
 
       if (process.env.NODE_ENV === 'development') {
@@ -294,12 +299,24 @@ export function AppProvider({ children }: { children: ReactNode }) {
       handleAuthenticatedUser(verifyResp);
     } catch (e: any) {
       console.error("[Passkey] Login failed:", e?.message ?? e);
+
+      // Provide specific error messages
+      let description = "Something went wrong. Please try again or use another method.";
+      if (e?.message?.includes("configuration") || e?.message?.includes("timeout")) {
+        description = "Service temporarily unavailable. Please use Email or Google login.";
+      } else if (e?.message?.includes("No credentials") || e?.message?.includes("not found")) {
+        description = "No passkey found. Please register a passkey first or use another method.";
+      }
+
       toast({
         title: "Login Error",
-        description: "Something went wrong. Please try again or use another method.",
+        description,
         variant: "destructive",
         duration: 4000
       });
+
+      // Auto-fallback to phone/email login
+      setCurrentScreen("phone");
     } finally {
       setIsLoggingIn(false);
     }
