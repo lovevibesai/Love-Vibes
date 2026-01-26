@@ -1,6 +1,7 @@
 "use client"
 
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
+import { toast } from "@/components/ui/use-toast"
 
 export type AppMode = "dating" | "friendship"
 export type AppScreen = "welcome" | "phone" | "mode" | "profile-setup" | "prompts" | "video" | "location" | "feed" | "matches" | "chat" | "profile" | "settings" | "filters" | "credits" | "expanded-profile" | "location-settings" | "visibility-settings" | "notification-settings" | "blocked-users" | "privacy-policy" | "terms-of-service" | "help-center" | "vibe-windows" | "voice-feed" | "success-stories" | "referral-dashboard" | "chemistry-test" | "mutual-friends" | "boost" | "innovative-features" | "identity-signature" | "social-endorsements"
@@ -239,9 +240,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     try {
       const data = await api.auth.loginGoogle(idToken);
       handleAuthenticatedUser(data);
-    } catch (e) {
+    } catch (e: any) {
       console.error("Google login failed", e);
-      throw e;
+      toast({
+        title: "Google Sign-In Failed",
+        description: e?.message || "Unable to sign in with Google. Please try another method.",
+        variant: "destructive",
+      });
+      setCurrentScreen("phone"); // Fallback to phone/email login
     }
   }
 

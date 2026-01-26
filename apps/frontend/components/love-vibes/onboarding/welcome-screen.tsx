@@ -58,12 +58,13 @@ export function WelcomeScreen() {
       const idToken = await result.user.getIdToken()
       await loginWithGoogle(idToken)
     } catch (error: any) {
-      console.error("Google Sign-In failed:", error)
-      if (error.code !== 'auth/popup-closed-by-user') {
-        setAuthError("Google Sign-In failed. Please try again.")
-        // Optional: Fallback to phone login after delay
-        // setTimeout(() => setCurrentScreen("phone"), 2000)
+      if (error.code === 'auth/popup-closed-by-user') {
+        // User cancelled, do nothing
+        return
       }
+      // Other errors will be handled by app-context
+      console.error("Google popup error:", error)
+      setAuthError("Unable to open Google Sign-In. Please try again.")
     }
   }
 
