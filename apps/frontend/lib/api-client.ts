@@ -81,10 +81,10 @@ export const api = {
         getRegisterOptions: async (userId?: string, email?: string) => {
             return apiRequest(`/v2/auth/register/options?user_id=${userId || ''}&email=${email || ''}`);
         },
-        verifyRegister: async (userId: string, email: string, response: any) => {
+        verifyRegister: async (userId: string, email: string, response: any, challengeId?: string) => {
             const res = await apiRequest('/v2/auth/register/verify', {
                 method: 'POST',
-                body: JSON.stringify({ user_id: userId, email, response }),
+                body: JSON.stringify({ user_id: userId, email, response, challengeId }),
             });
             if (res.success && res.token) {
                 localStorage.setItem('auth_token', res.token);
@@ -97,10 +97,10 @@ export const api = {
         getLoginOptions: async (email?: string) => {
             return apiRequest(`/v2/auth/login/options${email ? `?email=${email}` : ''}`);
         },
-        verifyLoginPasskey: async (response: any) => {
+        verifyLoginPasskey: async (response: any, challengeId?: string) => {
             const res = await apiRequest('/v2/auth/login/verify', {
                 method: 'POST',
-                body: JSON.stringify({ response }),
+                body: JSON.stringify({ response, challengeId }),
             });
             if (res.success && res.token) {
                 localStorage.setItem('auth_token', res.token);

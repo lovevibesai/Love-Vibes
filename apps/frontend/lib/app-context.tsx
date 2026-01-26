@@ -267,7 +267,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const userId = user?.id === "self" ? crypto.randomUUID() : user.id;
       const options = await api.auth.getRegisterOptions(userId, email);
       const regResp = await startRegistration({ optionsJSON: options });
-      const verifyResp = await api.auth.verifyRegister(userId, email, regResp);
+      const verifyResp = await api.auth.verifyRegister(userId, email, regResp, options.challengeId);
       if (verifyResp.success) handleAuthenticatedUser(verifyResp);
     } catch (e) { throw e; }
   }
@@ -295,7 +295,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     try {
       const options = await api.auth.getLoginOptions();
       const authResp = await startAuthentication({ optionsJSON: options });
-      const verifyResp = await api.auth.verifyLoginPasskey(authResp);
+      const verifyResp = await api.auth.verifyLoginPasskey(authResp, options.challengeId);
       if (verifyResp.success) {
         handleAuthenticatedUser(verifyResp);
       } else {

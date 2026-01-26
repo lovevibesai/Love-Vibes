@@ -18,8 +18,18 @@ function getJwtSecret(env: Env): Uint8Array {
 }
 
 // Helper for RP_ID
-function getRpId(env: Env): string {
-    return env.RP_ID || 'localhost';
+// Dynamically adjusts RP_ID for local development vs production domains
+function getRpId(request: Request, env: Env): string {
+    const origin = request.headers.get('Origin') || '';
+    const host = request.headers.get('Host') || '';
+
+    // Prioritize localhost if the request is coming from it
+    if (origin.includes('localhost') || host.includes('localhost')) {
+        return 'localhost';
+    }
+
+    // Default to the RP_ID from environment, or the hardcoded fallback
+    return env.RP_ID || 'love-vibes-app.pages.dev';
 }
 
 const RP_NAME = 'Love Vibes';
@@ -54,7 +64,7 @@ export async function handleAuth(request: Request, env: Env): Promise<Response> 
 
         const options = await generateRegistrationOptions({
             rpName: RP_NAME,
-            rpID: getRpId(env),
+            rpID: getRpId(request, env),
             userID: new TextEncoder().encode(userId) as any,
             userName: email,
             attestationType: 'none',
@@ -64,23 +74,24 @@ export async function handleAuth(request: Request, env: Env): Promise<Response> 
             },
         });
 
+        const challengeId = crypto.randomUUID();
         // Store challenge in D1 (short TTL)
         await env.DB.prepare(
             "INSERT INTO AuthChallenges (id, challenge, user_id, type, expires_at) VALUES (?, ?, ?, ?, ?)"
-        ).bind(crypto.randomUUID(), options.challenge, userId, 'registration', Date.now() + 60000).run();
+        ).bind(challengeId, options.challenge, userId, 'registration', Date.now() + 60000).run();
 
-        return new Response(JSON.stringify(options), { headers: { 'Content-Type': 'application/json' } });
+        return new Response(JSON.stringify({ ...options, challengeId }), { headers: { 'Content-Type': 'application/json' } });
     }
 
     // B. Verify Registration (POST /v2/auth/register/verify)
     if (path === '/v2/auth/register/verify' && request.method === 'POST') {
         const body = await request.json() as any;
-        const { response, user_id, email } = body;
+        const { response, user_id, email, challengeId } = body;
 
         // Fetch challenge from DB
         const challengeRow = await env.DB.prepare(
-            "SELECT challenge FROM AuthChallenges WHERE user_id = ? AND type = 'registration' ORDER BY expires_at DESC LIMIT 1"
-        ).bind(user_id).first();
+            "SELECT challenge FROM AuthChallenges WHERE (id = ? OR user_id = ?) AND type = 'registration' ORDER BY expires_at DESC LIMIT 1"
+        ).bind(challengeId || '', user_id).first();
 
         if (!challengeRow) return new Response("Challenge expired", { status: 400 });
 
@@ -91,10 +102,11 @@ export async function handleAuth(request: Request, env: Env): Promise<Response> 
                 'https://love-vibes-app.pages.dev',
                 'https://love-vibes-frontend.pages.dev',
                 'https://553b3734.love-vibes-app.pages.dev',
-                `https://${getRpId(env)}`,
-                'http://localhost:3000'
+                `https://${getRpId(request, env)}`,
+                'http://localhost:3000',
+                'http://localhost:3001'
             ],
-            expectedRPID: getRpId(env),
+            expectedRPID: getRpId(request, env),
         });
 
         if (verification.verified && verification.registrationInfo) {
@@ -160,7 +172,7 @@ export async function handleAuth(request: Request, env: Env): Promise<Response> 
         }
 
         const options = await generateAuthenticationOptions({
-            rpID: getRpId(env),
+            rpID: getRpId(request, env),
             allowCredentials,
             userVerification: 'preferred',
         });
@@ -170,13 +182,13 @@ export async function handleAuth(request: Request, env: Env): Promise<Response> 
             "INSERT INTO AuthChallenges (id, challenge, user_id, type, expires_at) VALUES (?, ?, ?, ?, ?)"
         ).bind(challengeId, options.challenge, '', 'login', Date.now() + 60000).run();
 
-        return new Response(JSON.stringify(options), { headers: { 'Content-Type': 'application/json' } });
+        return new Response(JSON.stringify({ ...options, challengeId }), { headers: { 'Content-Type': 'application/json' } });
     }
 
     // A3. Verify Passkey Login (POST /v2/auth/login/verify)
     if (path === '/v2/auth/login/verify' && request.method === 'POST') {
         const body = await request.json() as any;
-        const { response } = body;
+        const { response, challengeId } = body;
         if (!response || !response.id) {
             return new Response(JSON.stringify({ success: false, error: 'Invalid response' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
         }
@@ -191,8 +203,8 @@ export async function handleAuth(request: Request, env: Env): Promise<Response> 
         }
 
         const challengeRow = await env.DB.prepare(
-            "SELECT challenge FROM AuthChallenges WHERE type = 'login' AND expires_at > ? ORDER BY expires_at DESC LIMIT 1"
-        ).bind(Date.now()).first();
+            "SELECT challenge FROM AuthChallenges WHERE (id = ? OR type = 'login') AND expires_at > ? ORDER BY expires_at DESC LIMIT 1"
+        ).bind(challengeId || '', Date.now()).first();
 
         if (!challengeRow) {
             return new Response(JSON.stringify({ success: false, error: 'Challenge expired' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
@@ -212,11 +224,11 @@ export async function handleAuth(request: Request, env: Env): Promise<Response> 
                 'https://love-vibes-app.pages.dev',
                 'https://love-vibes-frontend.pages.dev',
                 'https://553b3734.love-vibes-app.pages.dev',
-                `https://${getRpId(env)}`,
+                `https://${getRpId(request, env)}`,
                 'http://localhost:3000',
                 'http://localhost:3001',
             ],
-            expectedRPID: getRpId(env),
+            expectedRPID: getRpId(request, env),
             credential,
         });
 
