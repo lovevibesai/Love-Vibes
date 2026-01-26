@@ -1,6 +1,7 @@
 name = "lovevibes"
 main = "src/index.ts"
 compatibility_date = "2025-01-18"
+compatibility_flags = [ "nodejs_compat" ]
 
 # Analytics Engine (LV AI Tracking)
 [[analytics_engine_datasets]]
