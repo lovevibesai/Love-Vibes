@@ -172,6 +172,83 @@ export async function handleAuth(request: Request, env: Env): Promise<Response> 
         return new Response("Invalid OTP", { status: 400 });
     }
 
+    // E. Google Sign-In (POST /v2/auth/login/google)
+    if (path === '/v2/auth/login/google' && request.method === 'POST') {
+        const body = await request.json() as { id_token?: string };
+        const idToken = body?.id_token;
+
+        if (!idToken || typeof idToken !== 'string') {
+            return new Response(JSON.stringify({ success: false, error: 'Missing id_token' }), {
+                status: 400,
+                headers: { 'Content-Type': 'application/json' },
+            });
+        }
+
+        // Verify the Firebase/Google ID token via Google's tokeninfo endpoint
+        let payload: { email?: string; sub?: string; error?: string };
+        try {
+            const res = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(idToken)}`);
+            const data = await res.json() as { email?: string; sub?: string; error?: string; error_description?: string };
+            if (!res.ok || data.error) {
+                console.error('[AUTH] Google tokeninfo error:', data.error || data.error_description || res.statusText);
+                return new Response(JSON.stringify({
+                    success: false,
+                    error: 'Invalid or expired Google sign-in. Please try again.',
+                }), {
+                    status: 401,
+                    headers: { 'Content-Type': 'application/json' },
+                });
+            }
+            payload = data;
+        } catch (e) {
+            console.error('[AUTH] Google token verification failed:', e);
+            return new Response(JSON.stringify({
+                success: false,
+                error: 'Google sign-in verification failed. Please try again.',
+            }), {
+                status: 502,
+                headers: { 'Content-Type': 'application/json' },
+            });
+        }
+
+        const email = payload.email || '';
+        if (!email) {
+            return new Response(JSON.stringify({ success: false, error: 'Email not provided by Google' }), {
+                status: 400,
+                headers: { 'Content-Type': 'application/json' },
+            });
+        }
+
+        // Find or create user by email (same pattern as passkey/email flows)
+        let userRow: { id: string; name?: string; is_onboarded?: number } | null = await env.DB.prepare(
+            "SELECT id, name, is_onboarded FROM Users WHERE email = ?"
+        ).bind(email).first() as any;
+
+        let isNewUser = false;
+        if (!userRow) {
+            const newId = crypto.randomUUID();
+            await env.DB.prepare(
+                "INSERT INTO Users (id, email, created_at) VALUES (?, ?, ?)"
+            ).bind(newId, email, Date.now()).run();
+            userRow = { id: newId, is_onboarded: 0 };
+            isNewUser = true;
+        }
+
+        const token = await issueToken(userRow.id, env);
+        const isOnboarded = !!userRow.is_onboarded;
+
+        return new Response(JSON.stringify({
+            success: true,
+            token,
+            user_id: userRow.id,
+            _id: userRow.id,
+            is_new_user: isNewUser,
+            is_onboarded: isOnboarded,
+        }), {
+            headers: { 'Content-Type': 'application/json' },
+        });
+    }
+
     return new Response("Not Found", { status: 404 });
 }
 

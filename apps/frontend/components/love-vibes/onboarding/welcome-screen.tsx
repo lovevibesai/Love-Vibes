@@ -58,13 +58,16 @@ export function WelcomeScreen() {
       const idToken = await result.user.getIdToken()
       await loginWithGoogle(idToken)
     } catch (error: any) {
-      if (error.code === 'auth/popup-closed-by-user') {
-        // User cancelled, do nothing
+      if (error?.code === 'auth/popup-closed-by-user') {
         return
       }
-      // Other errors will be handled by app-context
-      console.error("Google popup error:", error)
-      setAuthError("Unable to open Google Sign-In. Please try again.")
+      console.error("Google sign-in error:", error)
+      const isFirebaseError = error?.code && String(error.code).startsWith("auth/")
+      setAuthError(
+        isFirebaseError
+          ? "Unable to open Google Sign-In. Please try again."
+          : "Google Sign-In failed. Please try again."
+      )
     }
   }
 

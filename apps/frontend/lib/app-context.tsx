@@ -286,17 +286,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }
 
   const loginWithGoogle = async (idToken: string) => {
-    try {
-      const data = await api.auth.loginGoogle(idToken);
-      handleAuthenticatedUser(data);
-    } catch (e: any) {
-      toast({
-        title: "Google Sign-In Failed",
-        description: e?.message || "Please try another method.",
-        variant: "destructive",
-      });
-      setCurrentScreen("phone");
-    }
+    const data = await api.auth.loginGoogle(idToken);
+    handleAuthenticatedUser(data);
   }
 
   const loginWithPasskey = async () => {
