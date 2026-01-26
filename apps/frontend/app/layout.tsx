@@ -64,14 +64,6 @@ export default function RootLayout({
               {children}
             </main>
           </div>
-
-          {/* Optional: Desktop Blocker Overlay */}
-          <div className="hidden lg:flex fixed inset-0 z-[10000] bg-black items-center justify-center p-12 text-center flex-col">
-            <h1 className="text-4xl font-black text-[#D4AF37] mb-4">MOBILE ONLY</h1>
-            <p className="text-white/60 max-w-xs uppercase tracking-widest text-xs leading-relaxed">
-              Love Vibes is a sovereign mobile experience. Please access this protocol from your mobile device for full resonance.
-            </p>
-          </div>
         </ThemeProvider>
         <Analytics />
       </body>
