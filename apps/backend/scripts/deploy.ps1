@@ -61,5 +61,23 @@ npm run pages:build
 npx wrangler pages deploy .vercel/output/static --project-name love-vibes-frontend
 Set-Location ..
 
+# 6. Verify Deployment Health
+Write-Step "Verifying Deployment Health..."
+Start-Sleep -Seconds 5 # Give the worker a moment to stabilize
+$healthUrl = "https://lovevibes.thelovevibes-ai.workers.dev/health"
+try {
+    $health = Invoke-RestMethod -Uri $healthUrl -Method Get
+    if ($health.status -eq "healthy") {
+        Write-Host "✅ Backend is healthy and configured correctly." -ForegroundColor Green
+    }
+    else {
+        Write-Warning "⚠️ Backend is DEGRADED: $($health.checks.secrets)"
+        Write-Warning "Check your Cloudflare secrets (e.g., npx wrangler secret put JWT_SECRET)."
+    }
+}
+catch {
+    Write-Warning "❌ Could not reach health endpoint at $healthUrl. Check the URL and deployment logs."
+}
+
 Write-Host "`n🚀 DEPLOYMENT COMPLETE!" -ForegroundColor Magenta
 Write-Host "Check your Cloudflare dashboard for the URLs."

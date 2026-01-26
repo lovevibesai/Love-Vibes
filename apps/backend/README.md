@@ -23,3 +23,12 @@ Deploy to Cloudflare Workers:
 ```bash
 npx wrangler deploy
 ```
+
+### Secrets Management
+Critical secrets must be set manually in Cloudflare (they are not in `wrangler.toml` for security):
+```bash
+npx wrangler secret put JWT_SECRET
+npx wrangler secret put TURNSTILE_SECRET
+npx wrangler secret put RESEND_API_KEY
+```
+Use `./scripts/check_secrets.ps1` to verify the backend health and secrets configuration.
