@@ -2,6 +2,6 @@
 <resources>
     <string name="app_name">Love Vibes</string>
     <string name="title_activity_main">Love Vibes</string>
-    <string name="package_name">com.lovevibes.app</string>
-    <string name="custom_url_scheme">com.lovevibes.app</string>
+    <string name="package_name">love.vibes</string>
+    <string name="custom_url_scheme">love.vibes</string>
 </resources>

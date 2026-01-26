@@ -55,7 +55,9 @@ export function LoveVibesApp() {
         {currentScreen === "prompts" && <PromptsScreen />}
         {currentScreen === "video" && <VideoScreen />}
         {currentScreen === "location" && <LocationScreen />}
-        {!["welcome", "phone", "mode", "profile-setup", "prompts", "video", "location"].includes(currentScreen) && <WelcomeScreen />}
+        {currentScreen === "privacy-policy" && <LegalScreen type="privacy" />}
+        {currentScreen === "terms-of-service" && <LegalScreen type="terms" />}
+        {!["welcome", "phone", "mode", "profile-setup", "prompts", "video", "location", "privacy-policy", "terms-of-service"].includes(currentScreen) && <WelcomeScreen />}
         <DevToolbar />
       </div>
     )

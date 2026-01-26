@@ -8,7 +8,7 @@ interface LegalScreenProps {
 }
 
 export function LegalScreen({ type }: LegalScreenProps) {
-    const { setCurrentScreen } = useApp()
+    const { setCurrentScreen, isOnboarded } = useApp()
     const isPrivacy = type === "privacy"
 
     return (
@@ -17,7 +17,7 @@ export function LegalScreen({ type }: LegalScreenProps) {
                 {/* Header */}
                 <header className="flex items-center gap-3 px-4 py-3 border-b border-border bg-card sticky top-0 z-10 transition-colors">
                     <button
-                        onClick={() => setCurrentScreen("settings")}
+                        onClick={() => setCurrentScreen(isOnboarded ? "settings" : "welcome")}
                         className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-muted transition-all active:scale-95"
                     >
                         <ChevronLeft className="w-6 h-6 text-foreground" />

@@ -331,9 +331,19 @@ export function WelcomeScreen() {
         >
           <p className="text-xs text-[#F6EDEE]/40 leading-relaxed font-light">
             By continuing, you agree to our{" "}
-            <span className="underline cursor-pointer hover:text-[#F6EDEE]/60 transition-colors">Terms</span>
+            <span
+              onClick={() => setCurrentScreen("terms-of-service")}
+              className="underline cursor-pointer hover:text-[#F6EDEE]/60 transition-colors"
+            >
+              Terms
+            </span>
             {" & "}
-            <span className="underline cursor-pointer hover:text-[#F6EDEE]/60 transition-colors">Privacy Policy</span>
+            <span
+              onClick={() => setCurrentScreen("privacy-policy")}
+              className="underline cursor-pointer hover:text-[#F6EDEE]/60 transition-colors"
+            >
+              Privacy Policy
+            </span>
           </p>
         </motion.div>
       </motion.div>
