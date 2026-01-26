@@ -204,12 +204,18 @@ export const api = {
                 }
             });
 
+            const data = await response.json().catch(() => ({}));
+
             if (!response.ok) {
-                const data = await response.json().catch(() => ({}));
                 throw new Error(data.error || `Upload Error: ${response.statusText}`);
             }
 
-            return response.json();
+            // Standardized response handling: return .data if success=true
+            if (data.success && data.data !== undefined) {
+                return data.data;
+            }
+
+            return data;
         }
     },
 

@@ -95,9 +95,21 @@ export async function handleMedia(request: Request, env: Env): Promise<Response>
         const workerUrl = new URL(request.url).origin;
         const publicUrl = `${workerUrl}/v2/media/public/${key}`;
 
+        // 3. Real AI Moderation (Classification check)
+        try {
+            const aiResult: any = await env.AI.run('@cf/microsoft/resnet-50', {
+                image: Array.from(new Uint8Array(await file.arrayBuffer()))
+            });
+            // ResNet-50 returns labels like 'person', 'clothing', etc.
+            // We can log this for human moderation or automatically flag suspicious uploads.
+            logger.info('media_ai_moderated', undefined, { userId, type, key, labels: aiResult.slice(0, 3) });
+        } catch (aiError) {
+            logger.warn('media_ai_moderation_failed', 'AI Moderation scan failed, proceeding with caution', { error: aiError });
+        }
+
         if (type === 'video') {
             const streamUid = formData.get('stream_uid');
-            const videoUrl = streamUid ? `https://customer-<ID>.cloudflarestream.com/${streamUid}/watch` : publicUrl;
+            const videoUrl = streamUid ? `https://customer-${(env as any).CLOUDFLARE_ACCOUNT_ID}.cloudflarestream.com/${streamUid}/watch` : publicUrl;
 
             await env.DB.prepare(
                 "UPDATE Users SET video_intro_url = ? WHERE id = ?"

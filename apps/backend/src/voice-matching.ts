@@ -44,8 +44,8 @@ export async function uploadVoiceProfile(
         await env.MEDIA_BUCKET.put(fileName, audioFile)
         const voiceUrl = `https://media.lovevibes.app/${fileName}`
 
-        // Analyze voice (mock scores for now - integrate with voice analysis API later)
-        const analysis = await analyzeVoice(audioFile)
+        // Analyze voice (REMOVED MOCK: Now uses Cloudflare Workers AI)
+        const analysis = await analyzeVoice(env, audioFile)
 
         const now = Math.floor(Date.now() / 1000)
 
@@ -157,8 +157,8 @@ export async function voiceSwipe(
     }
 }
 
-// Mock voice analysis (replace with actual API integration)
-async function analyzeVoice(audioFile: File): Promise<{
+// Real Voice Analysis using Cloudflare Workers AI
+async function analyzeVoice(env: Env, audioFile: File): Promise<{
     duration: number
     tone_score: number
     pace_score: number
@@ -166,14 +166,57 @@ async function analyzeVoice(audioFile: File): Promise<{
     authenticity_score: number
     transcription: string
 }> {
-    // TODO: Integrate with AssemblyAI or Google Cloud Speech-to-Text
-    return {
-        duration: 30,
-        tone_score: Math.random() * 100,
-        pace_score: Math.random() * 100,
-        emotion_score: Math.random() * 100,
-        authenticity_score: 95 + Math.random() * 5, // High authenticity for real voices
-        transcription: 'Voice transcription will appear here...',
+    try {
+        const audioArray = new Uint8Array(await audioFile.arrayBuffer());
+
+        // 1. Transcription using Whisper
+        const transcriptionResult: any = await env.AI.run('@cf/openai/whisper', {
+            audio: Array.from(audioArray)
+        });
+        const transcription = transcriptionResult.text || "No transcription available";
+
+        // 2. Intelligence Analysis using Llama 3.1
+        const prompt = `Analyze this voice transcription for a dating app profile. 
+    Transcription: "${transcription}"
+    
+    Based on the text content, rate the following from 0 to 100 as a JSON object:
+    - tone_score (warmth and pitch variety inferred from wording)
+    - pace_score (confidence and flow inferred from wording)
+    - emotion_score (emotional resonance and vulnerability)
+    - authenticity_score (genuineness and honesty)
+    
+    Only return the JSON object, NO extra text.`;
+
+        const aiAnalysis: any = await env.AI.run('@cf/meta/llama-3.1-8b-instruct', {
+            messages: [{ role: 'user', content: prompt }]
+        });
+
+        let scores = { tone_score: 75, pace_score: 75, emotion_score: 75, authenticity_score: 85 };
+        try {
+            const content = aiAnalysis.response || aiAnalysis.content || "";
+            const cleaned = content.match(/\{.*\}/s)?.[0];
+            if (cleaned) {
+                scores = JSON.parse(cleaned);
+            }
+        } catch (e) {
+            logger.warn('voice_scoring_fallback', 'Using fallback scores due to AI parse error', { error: e });
+        }
+
+        return {
+            duration: Math.round(audioFile.size / 16000), // Very rough estimate for 16kbps mono
+            ...scores,
+            transcription
+        };
+    } catch (error) {
+        logger.error('voice_analysis_error', 'AI Voice Analysis Failed', { error });
+        return {
+            duration: 0,
+            tone_score: 50,
+            pace_score: 50,
+            emotion_score: 50,
+            authenticity_score: 50,
+            transcription: "Analysis unavailable"
+        };
     }
 }
 

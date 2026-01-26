@@ -213,11 +213,29 @@ async function findNearbyVenue(lat: number, long: number): Promise<{
     address: string
     type: string
 }> {
-    return {
-        name: 'Starbucks',
-        address: '123 Main St',
-        type: 'cafe',
+    try {
+        // Query Overpass API for cafes or restaurants within 500m
+        const query = `[out:json];node(around:500,${lat},${long})[amenity~"cafe|restaurant"];out 1;`;
+        const response = await fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`);
+        const data: any = await response.json();
+
+        if (data.elements && data.elements.length > 0) {
+            const venue = data.elements[0];
+            return {
+                name: venue.tags.name || 'Local Venue',
+                address: venue.tags['addr:street'] ? `${venue.tags['addr:street']}, ${venue.tags['addr:housenumber'] || ''}` : 'Nearby location',
+                type: venue.tags.amenity || 'social_spot',
+            };
+        }
+    } catch (e) {
+        logger.error('venue_search_failed', 'Overpass API search failed', { error: e });
     }
+
+    return {
+        name: 'Vibrant Social Hub',
+        address: `${lat.toFixed(4)}, ${long.toFixed(4)}`,
+        type: 'elite_spot',
+    };
 }
 
 // POST /api/proximity/respond - Accept/decline meetup
