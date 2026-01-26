@@ -95,7 +95,8 @@ export function VideoScreen() {
         if (user) {
           await updateUser({
             videoUrl: res.url,
-            hasVideoIntro: true
+            hasVideoIntro: true,
+            onboardingStep: 5
           })
         }
       } catch (err) {
@@ -103,12 +104,14 @@ export function VideoScreen() {
       } finally {
         setIsUploading(false)
       }
+    } else {
+      await updateUser({ onboardingStep: 5 })
     }
     setCurrentScreen("location")
   }
 
-  const handleSkip = () => {
-    localStorage.setItem('current_screen', 'location');
+  const handleSkip = async () => {
+    await updateUser({ onboardingStep: 5 })
     setCurrentScreen("location")
   }
 

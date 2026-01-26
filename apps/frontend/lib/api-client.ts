@@ -249,5 +249,16 @@ export const api = {
                 body: JSON.stringify({ enabled })
             });
         }
+    },
+    prompts: {
+        getAll: async () => {
+            return apiRequest('/v2/prompts/all');
+        },
+        saveResponses: async (userId: string, responses: any[]) => {
+            return apiRequest('/v2/prompts/responses', {
+                method: 'POST',
+                body: JSON.stringify({ userId, responses })
+            });
+        }
     }
 };

@@ -47,6 +47,7 @@ export interface User {
   mode: AppMode
   trustScore: number
   isOnboarded?: boolean
+  onboardingStep?: number
   hasVideoIntro?: boolean
 }
 
@@ -149,6 +150,7 @@ const mapBackendToUser = (data: any): User => {
     subscriptionTier: data.subscription_tier || 'free',
     trustScore: data.trust_score || 10,
     hasVideoIntro: !!data.video_intro_url,
+    onboardingStep: data.onboarding_step || 0,
   };
 };
 
@@ -183,6 +185,7 @@ const mapUserToBackend = (updates: Partial<User>): any => {
 
   if (updates.mode !== undefined) backend.mode = updates.mode === "friendship" ? 1 : 0;
   if (updates.isOnboarded !== undefined) backend.is_onboarded = updates.isOnboarded ? 1 : 0;
+  if (updates.onboardingStep !== undefined) backend.onboarding_step = updates.onboardingStep;
   if (updates.isVerified !== undefined) backend.is_verified = updates.isVerified ? 1 : 0;
   if (updates.subscriptionTier !== undefined) backend.subscription_tier = updates.subscriptionTier;
   if (updates.credits !== undefined) backend.credits_balance = updates.credits;
@@ -214,11 +217,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     // Navigate based on onboarding status
     setCurrentScreen(prev => {
-      if (mappedUser.isOnboarded && (prev === "welcome" || prev === "phone")) {
-        return "feed";
-      } else if (!mappedUser.isOnboarded && (prev === "welcome" || prev === "phone")) {
-        return "profile-setup";
+      if (mappedUser.isOnboarded) {
+        if (prev === "welcome" || prev === "phone") return "feed";
+        return prev;
       }
+
+      // If not onboarded, restore step
+      if (prev === "welcome" || prev === "phone") {
+        const steps: AppScreen[] = ["welcome", "mode", "profile-setup", "prompts", "video", "location"];
+        return steps[mappedUser.onboardingStep || 1] || "mode";
+      }
+
       return prev;
     });
   }, []); // Empty deps - no dependency on currentScreen

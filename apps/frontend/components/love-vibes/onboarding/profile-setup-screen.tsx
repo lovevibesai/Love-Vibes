@@ -55,31 +55,42 @@ const RELATIONSHIP_GOALS = [
 ]
 
 export function ProfileSetupScreen() {
-  const { setCurrentScreen, updateUser, mode } = useApp()
+  const { setCurrentScreen, updateUser, user, mode } = useApp()
 
   // Basic Info
-  const [name, setName] = useState("")
-  const [age, setAge] = useState("")
-  const [bio, setBio] = useState("")
-  const [gender, setGender] = useState<string>("")
-  const [interestedIn, setInterestedIn] = useState<string>("")
-  const [job, setJob] = useState("")
-  const [school, setSchool] = useState("")
+  const [name, setName] = useState(user?.name || "")
+  const [age, setAge] = useState(user?.age?.toString() || "")
+  const [bio, setBio] = useState(user?.bio || "")
+  const [gender, setGender] = useState<string>(user?.gender?.toString() || "")
+  const [interestedIn, setInterestedIn] = useState<string>(user?.interestedIn?.toString() || "")
+  const [job, setJob] = useState(user?.jobTitle || "")
+  const [school, setSchool] = useState(user?.school || "")
 
   // Photo Grid (6 Slots)
-  const [photos, setPhotos] = useState<(string | null)[]>([null, null, null, null, null, null])
+  const [photos, setPhotos] = useState<(string | null)[]>(() => {
+    const p: (string | null)[] = [null, null, null, null, null, null];
+    if (user?.photos) {
+      user.photos.forEach((url, i) => { if (i < 6) p[i] = url; });
+    } else if (user?.photoUrl) {
+      p[0] = user.photoUrl;
+    }
+    return p;
+  })
 
   // Priority Profile Fields
-  const [heightFt, setHeightFt] = useState("")
-  const [heightIn, setHeightIn] = useState("")
-  const [location, setLocation] = useState("")
-  const [relationshipGoals, setRelationshipGoals] = useState<string[]>([])
-  const [drinking, setDrinking] = useState("")
-  const [smoking, setSmoking] = useState("")
-  const [exercise, setExercise] = useState("")
-  const [diet, setDiet] = useState("")
-  const [pets, setPets] = useState("")
-  const [selectedInterests, setSelectedInterests] = useState<string[]>([])
+  const initialHeightFt = user?.height ? Math.floor(user.height / 30.48).toString() : ""
+  const initialHeightIn = user?.height ? Math.round((user.height % 30.48) / 2.54).toString() : ""
+
+  const [heightFt, setHeightFt] = useState(initialHeightFt)
+  const [heightIn, setHeightIn] = useState(initialHeightIn)
+  const [location, setLocation] = useState(user?.userLocation || "")
+  const [relationshipGoals, setRelationshipGoals] = useState<string[]>(user?.relationshipGoals || [])
+  const [drinking, setDrinking] = useState(user?.drinking || "")
+  const [smoking, setSmoking] = useState(user?.smoking || "")
+  const [exercise, setExercise] = useState(user?.exerciseFrequency || "")
+  const [diet, setDiet] = useState(user?.diet || "")
+  const [pets, setPets] = useState(user?.pets || "")
+  const [selectedInterests, setSelectedInterests] = useState<string[]>(user?.interests || [])
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [uploadingIndex, setUploadingIndex] = useState<number | null>(null)
 
@@ -160,7 +171,8 @@ export function ProfileSetupScreen() {
       exerciseFrequency: exercise,
       diet,
       pets,
-      mode: mode || "dating"
+      mode: mode || "dating",
+      onboardingStep: 3
     }
 
     try {

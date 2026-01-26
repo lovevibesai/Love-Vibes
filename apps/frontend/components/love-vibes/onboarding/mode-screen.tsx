@@ -6,11 +6,11 @@ import { motion, AnimatePresence } from "framer-motion"
 import { ArrowLeft, Heart, Users, Zap, Sparkles, Target } from "lucide-react"
 
 export function ModeScreen() {
-  const { setCurrentScreen, mode, setMode } = useApp()
+  const { setCurrentScreen, mode, setMode, updateUser } = useApp()
 
-  const handleModeSelect = (selectedMode: AppMode) => {
-    setMode(selectedMode)
-    localStorage.setItem('current_screen', 'profile-setup');
+  const handleModeSelect = async (selectedMode: AppMode) => {
+    // Save mode and onboarding step (Step 2 is Profile Setup)
+    await updateUser({ mode: selectedMode, onboardingStep: 2 })
     setCurrentScreen("profile-setup")
   }
 

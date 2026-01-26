@@ -62,7 +62,7 @@ export async function handleUserUpdate(request: Request, env: Env): Promise<Resp
             const row = await env.DB.prepare(
                 `SELECT id, email, name, birth_date, age, bio, gender, interested_in, job_title, company, school,
                  main_photo_url, photo_urls, video_intro_url, credits_balance, subscription_tier,
-                 is_verified, verification_status, is_id_verified, trust_score, is_onboarded, mode,
+                 is_verified, verification_status, is_id_verified, trust_score, is_onboarded, onboarding_step, mode,
                  city, location, hometown, height, relationship_goals, interests, drinking, smoking,
                  exercise_frequency, diet, pets, languages, ethnicity, religion, has_children, wants_children, star_sign,
                  last_active FROM Users WHERE id = ?`
@@ -107,7 +107,7 @@ export async function handleUserUpdate(request: Request, env: Env): Promise<Resp
                 'smoking', 'exercise_frequency', 'diet', 'pets', 'interests',
                 'languages', 'ethnicity', 'religion', 'has_children',
                 'wants_children', 'star_sign', 'job_title', 'school', 'company',
-                'photo_urls', 'main_photo_url', 'is_verified', 'is_onboarded', 'subscription_tier', 'age'
+                'photo_urls', 'main_photo_url', 'is_verified', 'is_onboarded', 'onboarding_step', 'subscription_tier', 'age'
             ];
 
             const updates = [];

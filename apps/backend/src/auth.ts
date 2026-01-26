@@ -240,8 +240,9 @@ export async function handleAuth(request: Request, env: Env): Promise<Response> 
             .bind(verification.authenticationInfo.newCounter, credRow.id).run();
 
         const userId = credRow.user_id;
-        const userRow = await env.DB.prepare("SELECT id, is_onboarded FROM Users WHERE id = ?").bind(userId).first() as { id: string; is_onboarded?: number } | null;
+        const userRow = await env.DB.prepare("SELECT id, is_onboarded, onboarding_step FROM Users WHERE id = ?").bind(userId).first() as { id: string; is_onboarded?: number; onboarding_step?: number } | null;
         const isOnboarded = !!userRow?.is_onboarded;
+        const onboardingStep = userRow?.onboarding_step || 0;
 
         const token = await issueToken(userId, env);
         return new Response(JSON.stringify({
@@ -250,6 +251,7 @@ export async function handleAuth(request: Request, env: Env): Promise<Response> 
             user_id: userId,
             _id: userId,
             is_onboarded: isOnboarded,
+            onboarding_step: onboardingStep,
         }), { headers: { 'Content-Type': 'application/json' } });
     }
 
@@ -276,12 +278,12 @@ export async function handleAuth(request: Request, env: Env): Promise<Response> 
 
         if (storedOtp && storedOtp === otp) {
             // Find or Create User
-            let user: any = await env.DB.prepare("SELECT id, name, is_onboarded FROM Users WHERE email = ?").bind(email).first();
+            let user: any = await env.DB.prepare("SELECT id, name, is_onboarded, onboarding_step FROM Users WHERE email = ?").bind(email).first();
             let isNewUser = false;
             if (!user) {
                 const newId = crypto.randomUUID();
                 await env.DB.prepare("INSERT INTO Users (id, email, created_at) VALUES (?, ?, ?)").bind(newId, email, Date.now()).run();
-                user = { id: newId, is_onboarded: 0 };
+                user = { id: newId, is_onboarded: 0, onboarding_step: 0 };
                 isNewUser = true;
             } else {
                 isNewUser = !user.name;
@@ -289,6 +291,7 @@ export async function handleAuth(request: Request, env: Env): Promise<Response> 
 
             const token = await issueToken(user.id, env);
             const isOnboarded = !!user.is_onboarded;
+            const onboardingStep = user.onboarding_step || 0;
             return new Response(JSON.stringify({
                 success: true,
                 token,
@@ -296,6 +299,7 @@ export async function handleAuth(request: Request, env: Env): Promise<Response> 
                 _id: user.id,
                 is_new_user: isNewUser,
                 is_onboarded: isOnboarded,
+                onboarding_step: onboardingStep,
             }));
         }
 
@@ -350,8 +354,8 @@ export async function handleAuth(request: Request, env: Env): Promise<Response> 
         }
 
         // Find or create user by email (same pattern as passkey/email flows)
-        let userRow: { id: string; name?: string; is_onboarded?: number } | null = await env.DB.prepare(
-            "SELECT id, name, is_onboarded FROM Users WHERE email = ?"
+        let userRow: { id: string; name?: string; is_onboarded?: number; onboarding_step?: number } | null = await env.DB.prepare(
+            "SELECT id, name, is_onboarded, onboarding_step FROM Users WHERE email = ?"
         ).bind(email).first() as any;
 
         let isNewUser = false;
@@ -360,7 +364,7 @@ export async function handleAuth(request: Request, env: Env): Promise<Response> 
             await env.DB.prepare(
                 "INSERT INTO Users (id, email, created_at) VALUES (?, ?, ?)"
             ).bind(newId, email, Date.now()).run();
-            userRow = { id: newId, is_onboarded: 0 };
+            userRow = { id: newId, is_onboarded: 0, onboarding_step: 0 };
             isNewUser = true;
         }
 
@@ -374,6 +378,7 @@ export async function handleAuth(request: Request, env: Env): Promise<Response> 
             _id: userRow.id,
             is_new_user: isNewUser,
             is_onboarded: isOnboarded,
+            onboarding_step: userRow.onboarding_step || 0,
         }), {
             headers: { 'Content-Type': 'application/json' },
         });

@@ -16,7 +16,7 @@ const FALLBACK_PROMPTS = [
 ]
 
 export function PromptsScreen() {
-    const { setCurrentScreen, user } = useApp()
+    const { setCurrentScreen, user, updateUser } = useApp()
     const [prompts, setPrompts] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
 
@@ -45,6 +45,7 @@ export function PromptsScreen() {
         try {
             const userId = user?.id || "self"
             await api.prompts.saveResponses(userId, responses)
+            await updateUser({ onboardingStep: 4 })
             setCurrentScreen("video")
         } catch (e) {
             console.error("Failed to save prompts", e)
@@ -52,7 +53,8 @@ export function PromptsScreen() {
         }
     }
 
-    const handleSkip = () => {
+    const handleSkip = async () => {
+        await updateUser({ onboardingStep: 4 })
         setCurrentScreen("video")
     }
 
