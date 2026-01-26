@@ -255,10 +255,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [currentScreen]);
 
-  const login = async (phone: string) => {
+  const login = async (email: string) => {
     try {
-      const data = await api.auth.loginLegacy(phone);
-      handleAuthenticatedUser(data);
+      const data = await api.auth.loginEmail(email);
+      // handleAuthenticatedUser(data); // This is just the first step of OTP
     } catch (e) { throw e; }
   }
 
@@ -266,7 +266,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     try {
       const userId = user?.id === "self" ? crypto.randomUUID() : user.id;
       const options = await api.auth.getRegisterOptions(userId, email);
-      const regResp = await startRegistration(options);
+      const regResp = await startRegistration({ optionsJSON: options });
       const verifyResp = await api.auth.verifyRegister(userId, email, regResp);
       if (verifyResp.success) handleAuthenticatedUser(verifyResp);
     } catch (e) { throw e; }
@@ -294,7 +294,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setIsLoggingIn(true);
     try {
       const options = await api.auth.getLoginOptions();
-      const authResp = await startAuthentication(options);
+      const authResp = await startAuthentication({ optionsJSON: options });
       const verifyResp = await api.auth.verifyLoginPasskey(authResp);
       if (verifyResp.success) {
         handleAuthenticatedUser(verifyResp);

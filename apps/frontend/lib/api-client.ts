@@ -203,5 +203,17 @@ export const api = {
 
             return response.json();
         }
+    },
+
+    referrals: {
+        getStats: async (userId: string) => {
+            return apiRequest(`/v2/referrals/stats?userId=${userId}`);
+        },
+        unlock: async (userId: string, scenarioType: 'intimate' | 'mystical') => {
+            return apiRequest('/v2/referrals/unlock', {
+                method: 'POST',
+                body: JSON.stringify({ userId, scenarioType })
+            });
+        }
     }
 };

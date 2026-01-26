@@ -11,6 +11,7 @@ CREATE TABLE Users (
     -- Profile Basics
     name TEXT,
     birth_date INTEGER,
+    age INTEGER,
     bio TEXT,
     gender INTEGER, -- 0: Male, 1: Female, 2: Non-binary
     interested_in INTEGER, -- 0: Men, 1: Women, 2: Everyone
@@ -18,6 +19,8 @@ CREATE TABLE Users (
     company TEXT,
     school TEXT,
     interests JSON,
+    referral_code TEXT,
+    scenario_keys INTEGER DEFAULT 0,
   
     -- Priority Profile Fields (Phase 1)
     height INTEGER, -- in cm
