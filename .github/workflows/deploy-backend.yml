@@ -6,8 +6,7 @@ on:
       - main
     paths:
       - 'apps/backend/**'
-      - 'packages/**'
-      - 'infra/**'
+      - 'infra/database/**'
 
 jobs:
   deploy:
@@ -23,9 +22,7 @@ jobs:
           cache: 'npm'
 
       - name: Install Dependencies
-        run: |
-          cd apps/backend
-          npm install
+        run: npm install
 
       - name: Deploy Backend
         uses: cloudflare/wrangler-action@v3
