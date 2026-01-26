@@ -57,17 +57,17 @@ export function WelcomeScreen() {
         className="relative min-h-screen overflow-hidden flex flex-col bg-black dark:bg-black"
       >
         {/* Animated Background - Pure Black Base */}
-        <div className="absolute inset-0 bg-black dark:bg-black" />
+        <div className="absolute inset-0 bg-black dark:bg-black pointer-events-none" />
 
         {/* Deep Cinematic Background */}
         <motion.div
-          className="absolute inset-0"
+          className="absolute inset-0 pointer-events-none"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 2 }}
         >
           <div
-            className="absolute inset-0"
+            className="absolute inset-0 pointer-events-none"
             style={{
               background: "radial-gradient(ellipse 120% 100% at 50% 60%, #3D132D 0%, #2A0D1F 35%, #1A0814 65%, #000000 100%)",
             }}
@@ -76,7 +76,7 @@ export function WelcomeScreen() {
 
         {/* Central Light Source */}
         <motion.div
-          className="absolute inset-0"
+          className="absolute inset-0 pointer-events-none"
           style={{
             background: "radial-gradient(ellipse 60% 50% at 50% 45%, rgba(139, 58, 58, 0.6) 0%, rgba(90, 31, 42, 0.3) 30%, transparent 70%)",
           }}
@@ -87,7 +87,7 @@ export function WelcomeScreen() {
 
         {/* Pulsing Ambient Glow */}
         <motion.div
-          className="absolute inset-0"
+          className="absolute inset-0 pointer-events-none"
           style={{
             background: "radial-gradient(circle at 50% 40%, rgba(212, 175, 55, 0.15) 0%, transparent 50%)",
           }}
