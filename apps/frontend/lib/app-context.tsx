@@ -78,6 +78,8 @@ interface AppContextType {
   setIsOnboarded: (value: boolean) => void
   user: User
   setUser: (user: User) => void
+  currentUser: User // Aliased for compatibility
+  setCurrentUser: (user: User) => void // Aliased for compatibility
   matches: Match[]
   setMatches: (matches: Match[]) => void
   showMatchModal: boolean
@@ -444,6 +446,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setMatchedUser,
         user,
         setUser,
+        currentUser: user,
+        setCurrentUser: setUser,
         updateUser,
         login,
         registerPasskey,

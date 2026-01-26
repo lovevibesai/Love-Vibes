@@ -11,6 +11,26 @@ Love Vibes is designed as a privacy-first, edge-native dating platform. Unlike t
 
 ### Core Components
 
+```mermaid
+graph TD
+    User((User)) -->|HTTPS| CF[Cloudflare Edge]
+    User -->|WSS| CF
+    
+    subgraph "Cloudflare Network"
+        CF -->|Auth/API| API[Worker API]
+        CF -->|Media| R2[R2 Storage]
+        CF -->|Hosting| Pages[Pages Frontend]
+        
+        API -->|Read/Write| DB[(D1 Database)]
+        
+        subgraph "Real-time"
+            API -->|Upgrade| DO[Chat Durable Object]
+            DO -->|Persist| DO_Storage[DO Storage]
+            DO -.->|Async Flush| DB
+        end
+    end
+```
+
 | Component | Technology | Purpose |
 |-----------|------------|---------|
 | **API Layer** | Cloudflare Workers | Serverless request handling, auth, business logic |

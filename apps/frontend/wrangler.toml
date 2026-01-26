@@ -3,4 +3,4 @@ compatibility_date = "2025-01-18"
 pages_build_output_dir = ".vercel/output/static"
 
 [vars]
-NEXT_PUBLIC_API_URL = "https://love-vibes-backend.thelovevibes-ai.workers.dev"
+NEXT_PUBLIC_API_URL = "https://lovevibes.thelovevibes-ai.workers.dev"

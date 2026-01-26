@@ -23,7 +23,9 @@ jobs:
           cache: 'npm'
 
       - name: Install Dependencies
-        run: npm ci
+        run: |
+          cd apps/backend
+          npm install
 
       - name: Deploy Backend
         uses: cloudflare/wrangler-action@v3

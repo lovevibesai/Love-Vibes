@@ -133,8 +133,8 @@ export function TrustScoreDetails({ score, onClose, isOwnProfile = false }: Trus
                 <div
                   key={index}
                   className={`p-4 rounded-xl border ${factor.completed
-                      ? "bg-trust-high/5 border-trust-high/20"
-                      : "bg-card border-border"
+                    ? "bg-trust-high/5 border-trust-high/20"
+                    : "bg-card border-border"
                     }`}
                 >
                   <div className="flex items-start justify-between">

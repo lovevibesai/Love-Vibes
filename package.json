@@ -2,8 +2,7 @@
     "name": "love-vibes-monorepo",
     "private": true,
     "workspaces": [
-        "apps/*",
-        "packages/*"
+        "apps/*"
     ],
     "scripts": {
         "dev:backend": "cd apps/backend && npm run dev",

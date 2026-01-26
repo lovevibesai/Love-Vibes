@@ -1,0 +1,20 @@
+[
+    {
+        "origins": [
+            "https://lovevibes.app",
+            "https://love-vibes-frontend.pages.dev",
+            "http://localhost:3000"
+        ],
+        "methods": [
+            "GET",
+            "PUT",
+            "POST",
+            "DELETE",
+            "HEAD"
+        ],
+        "responseHeader": [
+            "*"
+        ],
+        "maxAgeSeconds": 3600
+    }
+]
