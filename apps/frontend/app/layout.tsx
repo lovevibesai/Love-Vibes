@@ -42,6 +42,15 @@ export const metadata: Metadata = {
   },
 }
 
+const FirebaseInit = () => {
+  React.useEffect(() => {
+    import('@/lib/firebase').then(({ initAnalytics }) => {
+      initAnalytics();
+    });
+  }, []);
+  return null;
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -50,6 +59,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${inter.variable} ${playfair.variable} font-sans antialiased text-balance bg-black overflow-hidden`}>
+        <FirebaseInit />
         <ThemeProvider
           attribute="class"
           defaultTheme="dark"
