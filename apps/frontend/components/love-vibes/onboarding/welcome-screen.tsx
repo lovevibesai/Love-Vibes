@@ -271,11 +271,24 @@ export function WelcomeScreen() {
 
             {/* Google Sign In - Third Option */}
             <button
-              onClick={() => {
-                // In a real implementation this would trigger Google Auth
-                // For now we navigate to phone as fallback or trigger a mock
-                console.log("Google Sign In clicked");
-                // loginWithGoogle("demo-token"); 
+              onClick={async () => {
+                try {
+                  // Firebase Google Sign-In
+                  const { auth, googleProvider } = await import('@/lib/firebase');
+                  const { signInWithPopup } = await import('firebase/auth');
+
+                  const result = await signInWithPopup(auth, googleProvider);
+                  const idToken = await result.user.getIdToken();
+
+                  // Send to backend
+                  await loginWithGoogle(idToken);
+                } catch (error: any) {
+                  console.error("Google Sign-In failed:", error);
+                  if (error.code !== 'auth/popup-closed-by-user') {
+                    // Fallback to phone screen on error (except user cancel)
+                    setCurrentScreen("phone");
+                  }
+                }
               }}
               className="w-full h-16 text-base font-medium rounded-[20px] relative overflow-hidden group transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] bg-white text-black"
               style={{
