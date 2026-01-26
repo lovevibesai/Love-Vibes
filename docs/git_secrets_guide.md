@@ -10,7 +10,13 @@ To enable automatic deployments via GitHub Actions, you must configure the follo
 
 ### 1. `CLOUDFLARE_API_TOKEN`
 
-- **Value**: Your Cloudflare API Token (with "Edit Cloudflare Workers" permissions).
+- **Value**: Your Cloudflare API Token.
+- **Required Permissions**:
+  - `Account` > `Workers Scripts` > `Edit`
+  - `Account` > `D1` > `Edit`
+  - `Account` > `KV Storage` > `Edit`
+  - `Account` > `Workers R2` > `Edit`
+  - `User` > `User Details` > `Read` (Crucial for Wrangler auth)
 - **Criticality**: 🔴 Required for Backend CI.
 
 ### 2. `CLOUDFLARE_ACCOUNT_ID`
