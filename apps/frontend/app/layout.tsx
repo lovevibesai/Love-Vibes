@@ -1,7 +1,6 @@
 import React from "react"
 import type { Metadata, Viewport } from 'next'
 import { Inter, Playfair_Display } from 'next/font/google'
-import { Analytics } from '@vercel/analytics/next'
 import { ThemeProvider } from "@/components/theme-provider"
 import { FirebaseInit } from "@/components/firebase-init"
 import './globals.css'
@@ -65,7 +64,6 @@ export default function RootLayout({
             </main>
           </div>
         </ThemeProvider>
-        <Analytics />
       </body>
     </html>
   )
