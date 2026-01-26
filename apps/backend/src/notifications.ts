@@ -2,6 +2,17 @@
 // Web Push API integration for re-engagement
 
 import { Env } from './index'
+import { z } from 'zod';
+import { AuthenticationError, ValidationError, AppError } from './errors';
+
+// Zod Schema
+const PushSubscriptionSchema = z.object({
+    endpoint: z.string().url(),
+    keys: z.object({
+        p256dh: z.string().min(1),
+        auth: z.string().min(1),
+    }),
+});
 
 export interface PushSubscription {
     user_id: string
@@ -15,8 +26,9 @@ export interface PushSubscription {
 export async function subscribeToPush(
     env: Env,
     userId: string,
-    subscription: { endpoint: string; keys: { p256dh: string; auth: string } }
+    subscriptionRaw: any
 ): Promise<{ success: boolean; message: string }> {
+    const subscription = PushSubscriptionSchema.parse(subscriptionRaw);
     try {
         const now = Math.floor(Date.now() / 1000)
 
@@ -34,8 +46,10 @@ export async function subscribeToPush(
 
         return { success: true, message: 'Subscribed to push notifications' }
     } catch (error) {
-        console.error('Push subscription failed:', error)
-        return { success: false, message: 'Failed to subscribe' }
+        if (error instanceof z.ZodError) {
+            throw new ValidationError(error.errors[0].message);
+        }
+        throw error;
     }
 }
 
@@ -116,17 +130,21 @@ export async function notifyProfileView(env: Env, userId: string): Promise<void>
 export async function handleNotifications(request: Request, env: Env): Promise<Response> {
     const { verifyAuth } = await import('./auth');
     const userId = await verifyAuth(request, env);
-    if (!userId) return new Response("Unauthorized", { status: 401 });
+    if (!userId) throw new AuthenticationError();
 
     const url = new URL(request.url);
     const path = url.pathname;
     const method = request.method;
+    const jsonHeaders = { 'Content-Type': 'application/json' };
 
     if (path === '/v2/notifications/subscribe' && method === 'POST') {
         const body = await request.json() as any;
         const result = await subscribeToPush(env, userId, body.subscription);
-        return new Response(JSON.stringify(result), { headers: { 'Content-Type': 'application/json' } });
+        return new Response(JSON.stringify(result), { headers: jsonHeaders });
     }
 
-    return new Response("Not Found", { status: 404 });
+    return new Response(JSON.stringify({ error: 'Route not found' }), {
+        status: 404,
+        headers: jsonHeaders
+    });
 }

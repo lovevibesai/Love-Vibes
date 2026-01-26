@@ -4,12 +4,21 @@
  */
 import { Env } from './index';
 import { verifyAuth } from './auth';
+import { z } from 'zod';
+import { ValidationError, AuthenticationError, AppError } from './errors';
+
+// Zod Schema
+const GiftSchema = z.object({
+    recipient_id: z.string().uuid(),
+    gift_item_id: z.string().min(1),
+    message: z.string().max(200).optional(),
+});
 
 export async function handleGifting(request: Request, env: Env): Promise<Response> {
     const userId = await verifyAuth(request, env);
-    if (!userId) return new Response("Unauthorized", { status: 401 });
+    if (!userId) throw new AuthenticationError();
 
-    const body: any = await request.json();
+    const body = GiftSchema.parse(await request.json());
     const { recipient_id, gift_item_id, message } = body;
 
     // 1. Determine Gift Cost based on Tiered Architecture
@@ -35,9 +44,9 @@ export async function handleGifting(request: Request, env: Env): Promise<Respons
     const user: any = results[0];
 
     if (!user || user.credits_balance < giftCost) {
-        return new Response(JSON.stringify({ error: "Insufficient credits", required: giftCost, balance: user?.credits_balance || 0 }), {
-            status: 402,
-            headers: { 'Content-Type': 'application/json' }
+        throw new AppError("Insufficient credits", 402, 'INSUFFICIENT_CREDITS', {
+            required: giftCost,
+            balance: user?.credits_balance || 0
         });
     }
 
@@ -60,6 +69,7 @@ export async function handleGifting(request: Request, env: Env): Promise<Respons
         }), { headers: { 'Content-Type': 'application/json' } });
 
     } catch (e: any) {
-        return new Response(JSON.stringify({ error: e.message }), { status: 500 });
+        // Handled by global error boundary
+        throw e;
     }
 }

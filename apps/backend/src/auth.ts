@@ -10,6 +10,23 @@ import {
     generateAuthenticationOptions,
     verifyAuthenticationResponse,
 } from '@simplewebauthn/server';
+import { z } from 'zod';
+import { AuthenticationError, ValidationError, AppError } from './errors';
+import { checkRateLimit } from './ratelimit';
+
+// Zod Schemas for Validation
+const LoginEmailSchema = z.object({
+    email: z.string().email(),
+});
+
+const VerifyEmailSchema = z.object({
+    email: z.string().email(),
+    otp: z.string().length(6),
+});
+
+const GoogleLoginSchema = z.object({
+    id_token: z.string().min(1),
+});
 
 // Helper to get JWT Secret (fallback to dev secret if missing)
 function getJwtSecret(env: Env): Uint8Array {
@@ -147,10 +164,10 @@ export async function handleAuth(request: Request, env: Env): Promise<Response> 
                 _id: finalUserId,
                 is_new_user: isNewUser,
                 is_onboarded: isOnboarded,
-            }));
+            }), { headers: { 'Content-Type': 'application/json' } });
+        } else {
+            throw new ValidationError("Passkey verification failed");
         }
-
-        return new Response("Verification failed", { status: 400 });
     }
 
     // A2. Passkey Login Options (GET /v2/auth/login/options)
@@ -259,7 +276,16 @@ export async function handleAuth(request: Request, env: Env): Promise<Response> 
 
     // C. Request Email OTP (POST /v2/auth/login/email)
     if (path === '/v2/auth/login/email' && request.method === 'POST') {
-        const { email } = await request.json() as any;
+        const body = LoginEmailSchema.parse(await request.json());
+        const email = body.email;
+        const ip = request.headers.get('cf-connecting-ip') || 'unknown';
+
+        // Rate Limit OTP requests (3 per hour per IP/Email)
+        const rl = await checkRateLimit(env, `otp:${ip}:${email}`, 'signup');
+        if (!rl.allowed) {
+            throw new AppError("Too many OTP requests. Please try again later.", 429, 'RATE_LIMIT_EXCEEDED');
+        }
+
         const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
         // 1. Store OTP in KV (expires 5m)
@@ -268,55 +294,53 @@ export async function handleAuth(request: Request, env: Env): Promise<Response> 
         // 2. Send via Resend
         await sendEmail(email, `Your Love Vibes code: ${otp}`, env);
 
-        return new Response(JSON.stringify({ success: true, message: "OTP sent" }));
+        return new Response(JSON.stringify({ success: true, message: "OTP sent" }), {
+            headers: { 'Content-Type': 'application/json' }
+        });
     }
 
     // D. Verify Email OTP (POST /v2/auth/login/email/verify)
     if (path === '/v2/auth/login/email/verify' && request.method === 'POST') {
-        const { email, otp } = await request.json() as any;
+        const body = VerifyEmailSchema.parse(await request.json());
+        const { email, otp } = body;
         const storedOtp = await env.GEO_KV.get(`otp:${email}`);
 
-        if (storedOtp && storedOtp === otp) {
-            // Find or Create User
-            let user: any = await env.DB.prepare("SELECT id, name, is_onboarded, onboarding_step FROM Users WHERE email = ?").bind(email).first();
-            let isNewUser = false;
-            if (!user) {
-                const newId = crypto.randomUUID();
-                await env.DB.prepare("INSERT INTO Users (id, email, created_at) VALUES (?, ?, ?)").bind(newId, email, Date.now()).run();
-                user = { id: newId, is_onboarded: 0, onboarding_step: 0 };
-                isNewUser = true;
-            } else {
-                isNewUser = !user.name;
-            }
-
-            const token = await issueToken(user.id, env);
-            const isOnboarded = !!user.is_onboarded;
-            const onboardingStep = user.onboarding_step || 0;
-            return new Response(JSON.stringify({
-                success: true,
-                token,
-                user_id: user.id,
-                _id: user.id,
-                is_new_user: isNewUser,
-                is_onboarded: isOnboarded,
-                onboarding_step: onboardingStep,
-            }));
+        if (!storedOtp || storedOtp !== otp) {
+            throw new ValidationError("Invalid or expired OTP");
         }
 
-        return new Response("Invalid OTP", { status: 400 });
+        // Find or Create User
+        let user: any = await env.DB.prepare("SELECT id, name, is_onboarded, onboarding_step FROM Users WHERE email = ?").bind(email).first();
+        let isNewUser = false;
+        if (!user) {
+            const newId = crypto.randomUUID();
+            await env.DB.prepare("INSERT INTO Users (id, email, created_at) VALUES (?, ?, ?)").bind(newId, email, Date.now()).run();
+            user = { id: newId, is_onboarded: 0, onboarding_step: 0 };
+            isNewUser = true;
+        } else {
+            isNewUser = !user.name;
+        }
+
+        const token = await issueToken(user.id, env);
+        const isOnboarded = !!user.is_onboarded;
+        const onboardingStep = user.onboarding_step || 0;
+        return new Response(JSON.stringify({
+            success: true,
+            token,
+            user_id: user.id,
+            _id: user.id,
+            is_new_user: isNewUser,
+            is_onboarded: isOnboarded,
+            onboarding_step: onboardingStep,
+        }), {
+            headers: { 'Content-Type': 'application/json' }
+        });
     }
 
     // E. Google Sign-In (POST /v2/auth/login/google)
     if (path === '/v2/auth/login/google' && request.method === 'POST') {
-        const body = await request.json() as { id_token?: string };
-        const idToken = body?.id_token;
-
-        if (!idToken || typeof idToken !== 'string') {
-            return new Response(JSON.stringify({ success: false, error: 'Missing id_token' }), {
-                status: 400,
-                headers: { 'Content-Type': 'application/json' },
-            });
-        }
+        const body = GoogleLoginSchema.parse(await request.json());
+        const idToken = body.id_token;
 
         // Verify the Firebase/Google ID token via Google's tokeninfo endpoint
         let payload: { email?: string; sub?: string; error?: string };

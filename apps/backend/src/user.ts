@@ -8,20 +8,54 @@ import { Env } from './index';
 import { verifyAuth } from './auth';
 // @ts-ignore
 import { S2 } from 's2-geometry';
+import { z } from 'zod';
+import { ValidationError, NotFoundError, AppError, AuthenticationError } from './errors';
 
-// Helper for CORS Headers
-function corsHeaders(origin: string | null) {
-    return {
-        'Access-Control-Allow-Origin': origin || '*',
-        'Access-Control-Allow-Methods': 'GET, POST, PUT, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Auth-Token',
-        'Access-Control-Max-Age': '86400',
-    };
-}
+// Zod Schemas
+const ProfileUpdateSchema = z.object({
+    name: z.string().min(2).max(50).optional(),
+    bio: z.string().max(500).optional(),
+    age: z.number().min(18).max(100).optional(),
+    gender: z.number().optional(),
+    interested_in: z.number().optional(),
+    job_title: z.string().max(100).optional(),
+    company: z.string().max(100).optional(),
+    school: z.string().max(100).optional(),
+    city: z.string().max(100).optional(),
+    hometown: z.string().max(100).optional(),
+    height: z.number().optional(),
+    relationship_goals: z.array(z.string()).optional(),
+    interests: z.array(z.string()).optional(),
+    photo_urls: z.array(z.string()).optional(),
+    main_photo_url: z.string().url().optional(),
+    is_onboarded: z.number().optional(),
+    onboarding_step: z.number().optional(),
+    mode: z.number().optional(),
+}).strict();
 
-/**
- * Production Ready S2 Logic
- */
+const LocationPingSchema = z.object({
+    lat: z.number(),
+    long: z.number(),
+});
+
+const UserPreferencesSchema = z.object({
+    distance_max: z.number().min(1).max(100).optional(),
+    age_min: z.number().min(18).max(100).optional(),
+    age_max: z.number().min(18).max(100).optional(),
+    height_min: z.number().optional(),
+    height_max: z.number().optional(),
+    show_me: z.number().optional(),
+    filter_relationship_goals: z.array(z.string()).optional(),
+    filter_drinking: z.string().optional(),
+    filter_smoking: z.string().optional(),
+    filter_education: z.string().optional(),
+    filter_zodiac: z.string().optional(),
+    show_verified_only: z.boolean().optional(),
+    show_with_video_only: z.boolean().optional(),
+    min_trust_score: z.number().optional(),
+}).strict();
+
+// Production Ready S2 Logic
 function latLonToCellId(lat: number, lon: number, level: number = 12): string {
     try {
         const key = S2.latLngToKey(lat, lon, level);
@@ -35,26 +69,13 @@ function latLonToCellId(lat: number, lon: number, level: number = 12): string {
 }
 
 export async function handleUserUpdate(request: Request, env: Env): Promise<Response> {
-    const origin = request.headers.get('Origin');
-
-    // 1. Handle Preflight
-    if (request.method === 'OPTIONS') {
-        return new Response(null, { headers: corsHeaders(origin) });
-    }
-
-    const headers = { ...corsHeaders(origin), 'Content-Type': 'application/json' };
-
-    // 2. Verify Authentication
-    let userId: string;
-    try {
-        const authedId = await verifyAuth(request, env);
-        if (!authedId) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers });
-        userId = authedId;
-    } catch (e) {
-        return new Response(JSON.stringify({ error: 'Authentication check failed' }), { status: 401, headers });
-    }
+    // 1. Verify Authentication
+    const authedId = await verifyAuth(request, env);
+    if (!authedId) throw new AuthenticationError();
+    const userId = authedId;
 
     const url = new URL(request.url);
+    const jsonHeaders = { 'Content-Type': 'application/json' };
 
     try {
         // --- GET PROFILE ---
@@ -68,20 +89,16 @@ export async function handleUserUpdate(request: Request, env: Env): Promise<Resp
                  last_active FROM Users WHERE id = ?`
             ).bind(userId).first();
 
-            if (!row) {
-                return new Response(JSON.stringify({ error: 'User not found' }), { status: 404, headers });
-            }
-            return new Response(JSON.stringify(row), { headers });
+            if (!row) throw new NotFoundError('User');
+            return new Response(JSON.stringify(row), {
+                headers: { 'Content-Type': 'application/json' }
+            });
         }
 
         // --- LOCATION PING ---
         if (url.pathname === '/user/ping' && request.method === 'POST') {
-            const body: any = await request.json();
+            const body = LocationPingSchema.parse(await request.json());
             const { lat, long } = body;
-
-            if (lat === undefined || long === undefined) {
-                return new Response(JSON.stringify({ error: 'Missing lat/long' }), { status: 400, headers });
-            }
 
             const s2CellId = latLonToCellId(lat, long);
             const timestamp = Math.floor(Date.now() / 1000);
@@ -95,63 +112,49 @@ export async function handleUserUpdate(request: Request, env: Env): Promise<Resp
                 await env.GEO_KV.put(`user_loc:${userId}`, s2CellId, { expirationTtl: 86400 });
             }
 
-            return new Response(JSON.stringify({ success: true, cell_id: s2CellId }), { headers });
+            return new Response(JSON.stringify({ success: true, cell_id: s2CellId }), {
+                headers: { 'Content-Type': 'application/json' }
+            });
         }
 
         // --- PROFILE UPDATE ---
         if (url.pathname === '/user/profile' && request.method === 'PUT') {
-            const body: any = await request.json();
-            const allowedFields = [
-                'name', 'bio', 'mode', 'video_intro_url', 'gender', 'interested_in',
-                'city', 'hometown', 'height', 'relationship_goals', 'drinking',
-                'smoking', 'exercise_frequency', 'diet', 'pets', 'interests',
-                'languages', 'ethnicity', 'religion', 'has_children',
-                'wants_children', 'star_sign', 'job_title', 'school', 'company',
-                'photo_urls', 'main_photo_url', 'is_verified', 'is_onboarded', 'onboarding_step', 'subscription_tier', 'age'
-            ];
+            const body = ProfileUpdateSchema.parse(await request.json());
 
             const updates = [];
             const values = [];
 
-            for (const field of allowedFields) {
-                if (body[field] !== undefined) {
-                    updates.push(`${field} = ?`);
-                    values.push(body[field]);
-                }
+            for (const [field, value] of Object.entries(body)) {
+                updates.push(`${field} = ?`);
+                values.push(Array.isArray(value) ? JSON.stringify(value) : value);
             }
 
             if (updates.length === 0) {
-                return new Response(JSON.stringify({ error: 'No valid fields provided' }), { status: 400, headers });
+                throw new ValidationError('No valid fields provided');
             }
 
             values.push(userId);
             await env.DB.prepare(`UPDATE Users SET ${updates.join(', ')} WHERE id = ?`).bind(...values).run();
 
-            return new Response(JSON.stringify({ success: true, message: 'Profile updated' }), { headers });
+            return new Response(JSON.stringify({ success: true, message: 'Profile updated' }), {
+                headers: { 'Content-Type': 'application/json' }
+            });
         }
 
         // --- DISCOVERY PREFERENCES ---
         if (url.pathname === '/user/preferences' && request.method === 'POST') {
-            const body: any = await request.json();
-            const allowedPrefs = [
-                'distance_max', 'age_min', 'age_max', 'height_min', 'height_max',
-                'show_me', 'filter_relationship_goals', 'filter_drinking',
-                'filter_smoking', 'filter_education', 'filter_zodiac',
-                'show_verified_only', 'show_with_video_only', 'min_trust_score'
-            ];
+            const body = UserPreferencesSchema.parse(await request.json());
 
             const updates = [];
             const values = [];
 
-            for (const pref of allowedPrefs) {
-                if (body[pref] !== undefined) {
-                    updates.push(`${pref} = ?`);
-                    values.push(typeof body[pref] === 'object' ? JSON.stringify(body[pref]) : body[pref]);
-                }
+            for (const [pref, value] of Object.entries(body)) {
+                updates.push(`${pref} = ?`);
+                values.push(typeof value === 'object' ? JSON.stringify(value) : value);
             }
 
             if (updates.length === 0) {
-                return new Response(JSON.stringify({ error: 'No valid preferences' }), { status: 400, headers });
+                throw new ValidationError('No valid preferences provided');
             }
 
             // UPSERT for UserPreferences
@@ -167,13 +170,18 @@ export async function handleUserUpdate(request: Request, env: Env): Promise<Resp
 
             await env.DB.prepare(query).bind(userId, ...values, ...values).run();
 
-            return new Response(JSON.stringify({ success: true, message: 'Preferences updated' }), { headers });
+            return new Response(JSON.stringify({ success: true, message: 'Preferences updated' }), {
+                headers: jsonHeaders
+            });
         }
 
     } catch (err: any) {
-        console.error('[USER] Operation failed:', err);
-        return new Response(JSON.stringify({ error: 'Internal server error', details: err.message }), { status: 500, headers });
+        // Errors are caught by the global handler in index.ts
+        throw err;
     }
 
-    return new Response(JSON.stringify({ error: 'Route not found' }), { status: 404, headers });
+    return new Response(JSON.stringify({ error: 'Route not found' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json' }
+    });
 }

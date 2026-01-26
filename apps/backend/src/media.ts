@@ -4,6 +4,8 @@
  */
 import { Env } from './index';
 import { verifyAuth } from './auth';
+import { AuthenticationError, AppError, ServerError, NotFoundError } from './errors';
+import { logger } from './logger';
 
 export async function handleMedia(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
@@ -27,8 +29,8 @@ export async function handleMedia(request: Request, env: Env): Promise<Response>
         const object = await env.MEDIA_BUCKET.get(key);
 
         if (!object) {
-            console.warn(`[MEDIA] Object Not Found: ${key}`);
-            return new Response('Object Not Found', { status: 404 });
+            logger.warn('media_not_found', 'Public object not found', { key });
+            throw new NotFoundError('Media object');
         }
 
         const headers = new Headers();
@@ -43,7 +45,7 @@ export async function handleMedia(request: Request, env: Env): Promise<Response>
     }
 
     const userId = await verifyAuth(request, env);
-    if (!userId) return new Response("Unauthorized", { status: 401 });
+    if (!userId) throw new AuthenticationError();
 
     // 1. Get Direct Upload URL for Cloudflare Stream (GET /v2/media/video-upload-url)
     if (method === 'GET' && pathMatches(path, '/v2/media/video-upload-url')) {
@@ -51,7 +53,8 @@ export async function handleMedia(request: Request, env: Env): Promise<Response>
         const apiToken = (env as any).CLOUDFLARE_API_TOKEN;
 
         if (!accountId || !apiToken) {
-            return new Response(JSON.stringify({ error: "Cloudflare Stream secrets not configured" }), { status: 500 });
+            logger.error('media_config_error', 'Cloudflare Stream secrets not configured');
+            throw new ServerError("Media processing service not configured");
         }
 
         const streamResponse = await fetch(
@@ -79,9 +82,9 @@ export async function handleMedia(request: Request, env: Env): Promise<Response>
     if (method === 'POST' && pathMatches(url.pathname, '/v2/media/upload')) {
         const formData = await request.formData();
         const file = formData.get('file') as unknown as File;
-        const type = formData.get('type') || 'photo'; // 'photo' or 'video'
+        const type = String(formData.get('type') || 'photo');
 
-        if (!file) return new Response("No file provided", { status: 400 });
+        if (!file) throw new AppError("No file provided", 400);
 
         const fileId = crypto.randomUUID();
         // Sanitize extension: only alphanumeric
@@ -131,13 +134,16 @@ export async function handleMedia(request: Request, env: Env): Promise<Response>
             ).bind(JSON.stringify(photos), photos[0], userId).run();
         }
 
+        logger.info('media_uploaded', undefined, { userId, type, key });
+
         return new Response(JSON.stringify({
+            success: true,
             status: "uploaded",
             url: publicUrl
         }), { headers: { 'Content-Type': 'application/json' } });
     }
 
-    return new Response("Not Found", { status: 404 });
+    throw new NotFoundError("Media route");
 }
 
 function pathMatches(path: string, target: string) {

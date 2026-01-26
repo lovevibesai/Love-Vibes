@@ -2,6 +2,23 @@
 // Real-time meetup triggers when matched users are nearby
 
 import { Env } from './index'
+import { z } from 'zod';
+import { AuthenticationError, ValidationError, AppError } from './errors';
+
+// Zod Schemas
+const EnableProximitySchema = z.object({
+    enabled: z.boolean(),
+});
+
+const UpdateLocationSchema = z.object({
+    lat: z.number().min(-90).max(90),
+    long: z.number().min(-180).max(180),
+});
+
+const RespondAlertSchema = z.object({
+    alert_id: z.string().uuid(),
+    response: z.enum(['accepted', 'declined']),
+});
 
 export interface ProximityAlert {
     id: string
@@ -36,9 +53,8 @@ export async function enableProximity(
             success: true,
             message: enabled ? 'Proximity alerts enabled' : 'Proximity alerts disabled',
         }
-    } catch (error) {
-        console.error('Failed to update proximity settings:', error)
-        return { success: false, message: 'Failed to update settings' }
+    } catch (error: any) {
+        throw new AppError('Failed to enable/disable proximity', 500, 'PROXIMITY_UPDATE_FAILED', error);
     }
 }
 
@@ -69,9 +85,8 @@ export async function updateLocation(
         }
 
         return { success: true }
-    } catch (error) {
-        console.error('Location update failed:', error)
-        return { success: false }
+    } catch (error: any) {
+        throw new AppError('Failed to update location', 500, 'LOCATION_UPDATE_FAILED', error);
     }
 }
 
@@ -224,38 +239,41 @@ export async function respondToProximityAlert(
             .run()
 
         return { success: true, message: response === 'accepted' ? 'Meetup confirmed!' : 'Declined' }
-    } catch (error) {
-        console.error('Failed to respond to alert:', error)
-        return { success: false, message: 'Failed to respond' }
+    } catch (error: any) {
+        throw new AppError('Failed to respond to proximity alert', 500, 'PROXIMITY_RESPOND_FAILED', error);
     }
 }
 
 export async function handleProximity(request: Request, env: Env): Promise<Response> {
     const { verifyAuth } = await import('./auth');
     const userId = await verifyAuth(request, env);
-    if (!userId) return new Response("Unauthorized", { status: 401 });
+    if (!userId) throw new AuthenticationError();
 
     const url = new URL(request.url);
     const path = url.pathname;
     const method = request.method;
+    const jsonHeaders = { 'Content-Type': 'application/json' };
 
     if (path === '/v2/proximity/enable' && method === 'POST') {
-        const body = await request.json() as any;
+        const body = EnableProximitySchema.parse(await request.json());
         const result = await enableProximity(env, userId, body.enabled);
-        return new Response(JSON.stringify(result), { headers: { 'Content-Type': 'application/json' } });
+        return new Response(JSON.stringify(result), { headers: jsonHeaders });
     }
 
     if (path === '/v2/proximity/update' && method === 'POST') {
-        const body = await request.json() as any;
+        const body = UpdateLocationSchema.parse(await request.json());
         const result = await updateLocation(env, userId, body.lat, body.long);
-        return new Response(JSON.stringify(result), { headers: { 'Content-Type': 'application/json' } });
+        return new Response(JSON.stringify(result), { headers: jsonHeaders });
     }
 
     if (path === '/v2/proximity/respond' && method === 'POST') {
-        const body = await request.json() as any;
+        const body = RespondAlertSchema.parse(await request.json());
         const result = await respondToProximityAlert(env, body.alert_id, userId, body.response);
-        return new Response(JSON.stringify(result), { headers: { 'Content-Type': 'application/json' } });
+        return new Response(JSON.stringify(result), { headers: jsonHeaders });
     }
 
-    return new Response("Not Found", { status: 404 });
+    return new Response(JSON.stringify({ error: 'Route not found' }), {
+        status: 404,
+        headers: jsonHeaders
+    });
 }

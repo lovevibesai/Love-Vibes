@@ -4,16 +4,26 @@
  */
 import { Env } from './index';
 import { verifyAuth } from './auth';
+import { z } from 'zod';
+import { ValidationError, AuthenticationError, AppError } from './errors';
+
+const SwipeSchema = z.object({
+    id: z.string().uuid(),
+});
 
 export async function handleSwipe(request: Request, env: Env): Promise<Response> {
     const userId = await verifyAuth(request, env); // Actor
-    if (!userId) return new Response("Unauthorized", { status: 401 });
+    if (!userId) throw new AuthenticationError();
 
     const url = new URL(request.url);
     const targetId = url.searchParams.get('id');
     const type = url.pathname === '/like' ? 'LIKE' : 'PASS';
 
-    if (!targetId) return new Response("Missing target ID", { status: 400 });
+    // Validate using Zod (even if from query params)
+    const validation = SwipeSchema.safeParse({ id: targetId });
+    if (!validation.success) {
+        throw new ValidationError("Missing or invalid target ID");
+    }
 
     // 1. Record the Swipe
     const timestamp = Date.now();
@@ -53,7 +63,7 @@ export async function handleSwipe(request: Request, env: Env): Promise<Response>
     }
 
     return new Response(JSON.stringify({
-        meta: { status: 200 },
+        success: true,
         data: {
             swiped: true,
             match: matchData

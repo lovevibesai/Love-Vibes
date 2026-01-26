@@ -1,16 +1,25 @@
 import { Env } from './index';
 import { verifyAuth } from './auth';
+import { z } from 'zod';
+import { ValidationError, AuthenticationError, AppError } from './errors';
+
+const ReportSchema = z.object({
+    reported_id: z.string().uuid(),
+    reason: z.string().min(1).max(100),
+    details: z.string().max(500).optional(),
+});
+
+const BlockSchema = z.object({
+    blocked_id: z.string().uuid(),
+});
 
 export async function handleReportUser(request: Request, env: Env): Promise<Response> {
     const userId = await verifyAuth(request, env);
-    if (!userId) return new Response("Unauthorized", { status: 401 });
+    if (!userId) throw new AuthenticationError();
 
     try {
-        const { reported_id, reason, details } = await request.json() as any;
-
-        if (!reported_id || !reason) {
-            return new Response('Missing fields', { status: 400 });
-        }
+        const body = ReportSchema.parse(await request.json());
+        const { reported_id, reason, details } = body;
 
         const reportId = crypto.randomUUID();
         const timestamp = Date.now();
@@ -29,21 +38,20 @@ export async function handleReportUser(request: Request, env: Env): Promise<Resp
         });
 
     } catch (e) {
-        console.error(e);
-        return new Response('Error processing report', { status: 500 });
+        if (e instanceof z.ZodError) {
+            throw new ValidationError(e.errors[0].message);
+        }
+        throw e;
     }
 }
 
 export async function handleBlockUser(request: Request, env: Env): Promise<Response> {
     const userId = await verifyAuth(request, env);
-    if (!userId) return new Response("Unauthorized", { status: 401 });
+    if (!userId) throw new AuthenticationError();
 
     try {
-        const { blocked_id } = await request.json() as any;
-
-        if (!blocked_id) {
-            return new Response('Missing fields', { status: 400 });
-        }
+        const body = BlockSchema.parse(await request.json());
+        const { blocked_id } = body;
 
         const timestamp = Date.now();
         await env.DB.prepare(
@@ -54,6 +62,6 @@ export async function handleBlockUser(request: Request, env: Env): Promise<Respo
             headers: { 'Content-Type': 'application/json' }
         });
     } catch (e) {
-        return new Response('Error blocking user', { status: 500 });
+        throw e;
     }
 }

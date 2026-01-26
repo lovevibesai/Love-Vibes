@@ -17,6 +17,25 @@ export interface ChemistryResult {
     message: string
 }
 
+import { z } from 'zod';
+import { ValidationError, AuthenticationError, AppError, NotFoundError } from './errors';
+
+// Zod Schemas
+const StartTestSchema = z.object({
+    match_id: z.string().uuid(),
+    target_id: z.string().uuid(),
+});
+
+const HeartRateDataSchema = z.object({
+    timestamp: z.number(),
+    bpm: z.number().min(30).max(220), // Physiological limits
+});
+
+const SubmitDataSchema = z.object({
+    test_id: z.string().uuid(),
+    heart_rate_data: z.array(HeartRateDataSchema).min(1),
+});
+
 // POST /api/chemistry/start-test - Initialize chemistry test
 export async function startChemistryTest(
     env: Env,
@@ -167,23 +186,28 @@ export async function handleChemistry(request: Request, env: Env): Promise<Respo
     const path = url.pathname;
     const method = request.method;
 
+    const jsonHeaders = { 'Content-Type': 'application/json' };
+
     if (path === '/v2/chemistry/start' && method === 'POST') {
-        const body = await request.json() as any;
+        const body = StartTestSchema.parse(await request.json());
         const result = await startChemistryTest(env, body.match_id, userId, body.target_id);
-        return new Response(JSON.stringify(result), { headers: { 'Content-Type': 'application/json' } });
+        if (!result.success) throw new AppError("Failed to start chemistry test", 500);
+        return new Response(JSON.stringify(result), { headers: jsonHeaders });
     }
 
     if (path === '/v2/chemistry/submit' && method === 'POST') {
-        const body = await request.json() as any;
+        const body = SubmitDataSchema.parse(await request.json());
         const result = await submitChemistryData(env, body.test_id, userId, body.heart_rate_data);
-        return new Response(JSON.stringify(result), { headers: { 'Content-Type': 'application/json' } });
+        if (!result.success) throw new AppError("Failed to submit chemistry data", 500);
+        return new Response(JSON.stringify(result), { headers: jsonHeaders });
     }
 
     if (path.startsWith('/v2/chemistry/results/') && method === 'GET') {
         const testId = path.split('/').pop();
-        if (!testId) return new Response("Missing test ID", { status: 400 });
+        if (!testId) throw new ValidationError("Missing test ID");
         const result = await getChemistryResults(env, testId);
-        return new Response(JSON.stringify(result), { headers: { 'Content-Type': 'application/json' } });
+        if (!result) throw new NotFoundError("Chemistry test results");
+        return new Response(JSON.stringify(result), { headers: jsonHeaders });
     }
 
     return new Response("Not Found", { status: 404 });

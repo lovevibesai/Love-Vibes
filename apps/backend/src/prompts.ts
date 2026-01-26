@@ -2,6 +2,16 @@
 // Handles prompt library and user responses
 
 import { Env } from './index'
+import { z } from 'zod';
+import { ValidationError, AppError } from './errors';
+
+const PromptResponseSchema = z.object({
+    prompt_id: z.string().min(1),
+    response_text: z.string().min(1).max(200),
+    display_order: z.number().int().min(0).max(2),
+});
+
+const SavePromptsSchema = z.array(PromptResponseSchema).length(3);
 
 export interface ProfilePrompt {
     id: string
@@ -32,11 +42,9 @@ export async function getPrompts(env: Env): Promise<ProfilePrompt[]> {
 export async function saveUserPrompts(
     env: Env,
     userId: string,
-    prompts: Array<{ prompt_id: string; response_text: string; display_order: number }>
+    promptsRaw: any
 ): Promise<{ success: boolean; message: string }> {
-    if (prompts.length !== 3) {
-        return { success: false, message: 'Must select exactly 3 prompts' }
-    }
+    const prompts = SavePromptsSchema.parse(promptsRaw);
 
     const now = Math.floor(Date.now() / 1000)
 
@@ -55,8 +63,10 @@ export async function saveUserPrompts(
 
         return { success: true, message: 'Prompts saved successfully' }
     } catch (error) {
-        console.error('Error saving prompts:', error)
-        return { success: false, message: 'Failed to save prompts' }
+        if (error instanceof z.ZodError) {
+            throw new ValidationError(error.errors[0].message);
+        }
+        throw error;
     }
 }
 

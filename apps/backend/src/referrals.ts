@@ -2,6 +2,14 @@
 // Track referrals and reward users with Scenario Keys
 
 import { Env } from './index'
+import { z } from 'zod';
+import { ValidationError, AppError, NotFoundError } from './errors';
+
+// Zod Schema
+const UnlockScenarioSchema = z.object({
+    userId: z.string().uuid(),
+    scenarioType: z.enum(['intimate', 'mystical']),
+});
 
 export interface ReferralStats {
     referral_code: string
@@ -21,7 +29,7 @@ export async function generateReferralCode(env: Env, userId: string): Promise<st
         .bind(userId)
         .first()
 
-    if (!user) throw new Error('User not found')
+    if (!user) throw new NotFoundError('User')
 
     // Generate code: FIRSTNAME + 4 random chars
     const firstName = (user.name as string).split(' ')[0].toUpperCase()
@@ -76,7 +84,7 @@ export async function trackReferral(
 
 export async function getReferralStats(env: Env, userId: string): Promise<ReferralStats> {
     try {
-        if (!env.DB) throw new Error("Database not bound");
+        if (!env.DB) throw new AppError("Database not bound", 503, 'CONFIG_ERROR');
 
         // Get user's referral code and keys
         const user = await env.DB.prepare('SELECT referral_code, scenario_keys FROM Users WHERE id = ?')
@@ -182,12 +190,13 @@ export async function getReferralStats(env: Env, userId: string): Promise<Referr
 
 // Unlock a scenario (spend a key)
 export async function unlockScenario(env: Env, userId: string, scenarioType: 'intimate' | 'mystical'): Promise<{ success: boolean, keysRemaining: number }> {
+    // Note: In handleRequest, we parse this with UnlockScenarioSchema
     const user = await env.DB.prepare('SELECT scenario_keys FROM Users WHERE id = ?')
         .bind(userId)
         .first()
 
     if (!user || (user.scenario_keys as number) < 1) {
-        throw new Error("Insufficient Scenario Keys")
+        throw new AppError("Insufficient Scenario Keys", 402, 'INSUFFICIENT_KEYS');
     }
 
     // Deduct key

@@ -4,17 +4,32 @@
  */
 import { Env } from './index';
 import { verifyAuth } from './auth';
+import { z } from 'zod';
+import { ValidationError, AuthenticationError, AppError } from './errors';
+import { logger } from './logger';
+
+// Zod Schemas
+const PurchaseCreditsSchema = z.object({
+    package_id: z.enum(['starter', 'popular', 'premium', 'ultimate']),
+    payment_token: z.string().min(1),
+});
+
+const SubscribeSchema = z.object({
+    tier: z.enum(['plus', 'platinum']),
+    interval: z.enum(['monthly', 'yearly']),
+});
 
 export async function handleBilling(request: Request, env: Env): Promise<Response> {
     const userId = await verifyAuth(request, env);
-    if (!userId) return new Response("Unauthorized", { status: 401 });
+    if (!userId) throw new AuthenticationError();
 
     const url = new URL(request.url);
     const path = url.pathname;
+    const jsonHeaders = { 'Content-Type': 'application/json' };
 
     // 1. Purchase Credits (POST /v2/billing/purchase-credits)
     if (path === '/v2/billing/purchase-credits' && request.method === 'POST') {
-        const body: any = await request.json();
+        const body = PurchaseCreditsSchema.parse(await request.json());
         const { package_id, payment_token } = body;
 
         // In production, validate payment_token with Stripe/Apple/Google
@@ -27,8 +42,7 @@ export async function handleBilling(request: Request, env: Env): Promise<Respons
             'ultimate': 1000
         };
 
-        const creditsToGrant = packages[package_id] || 0;
-        if (creditsToGrant === 0) return new Response("Invalid package", { status: 400 });
+        const creditsToGrant = packages[package_id];
 
         const timestamp = Date.now();
         const transactionId = crypto.randomUUID();
@@ -49,10 +63,8 @@ export async function handleBilling(request: Request, env: Env): Promise<Respons
 
     // 2. Subscribe (POST /v2/billing/subscribe)
     if (path === '/v2/billing/subscribe' && request.method === 'POST') {
-        const body: any = await request.json();
-        const { tier, interval } = body; // tier: 'plus', 'platinum' | interval: 'monthly', 'yearly'
-
-        if (!['plus', 'platinum'].includes(tier)) return new Response("Invalid tier", { status: 400 });
+        const body = SubscribeSchema.parse(await request.json());
+        const { tier, interval } = body;
 
         const duration = interval === 'yearly' ? 365 * 24 * 60 * 60 * 1000 : 30 * 24 * 60 * 60 * 1000;
         const expiresAt = Date.now() + duration;
@@ -79,7 +91,10 @@ export async function handleBilling(request: Request, env: Env): Promise<Respons
         });
     }
 
-    return new Response("Not Found", { status: 404 });
+    return new Response(JSON.stringify({ error: 'Route not found' }), {
+        status: 404,
+        headers: jsonHeaders
+    });
 }
 
 /**
@@ -95,19 +110,13 @@ export async function handleStripeWebhook(request: Request, env: Env): Promise<R
 
     // CRITICAL: Reject unsigned webhooks
     if (!signature) {
-        console.error('SECURITY: Stripe webhook missing signature');
-        return new Response(JSON.stringify({ error: 'Missing signature' }), {
-            status: 401,
-            headers: { 'Content-Type': 'application/json' }
-        });
+        logger.error('stripe_webhook_security', 'Missing signature');
+        throw new AuthenticationError('Missing Stripe signature');
     }
 
     if (!webhookSecret) {
-        console.error('CRITICAL: STRIPE_WEBHOOK_SECRET not configured');
-        return new Response(JSON.stringify({ error: 'Webhook not configured' }), {
-            status: 503,
-            headers: { 'Content-Type': 'application/json' }
-        });
+        logger.error('stripe_webhook_config', 'STRIPE_WEBHOOK_SECRET not configured');
+        throw new AppError('Webhook not configured', 503, 'CONFIG_ERROR');
     }
 
     const body = await request.text();
@@ -116,11 +125,8 @@ export async function handleStripeWebhook(request: Request, env: Env): Promise<R
     const isValid = await verifyStripeSignature(body, signature, webhookSecret);
 
     if (!isValid) {
-        console.error('SECURITY: Invalid Stripe webhook signature - possible spoofing attempt');
-        return new Response(JSON.stringify({ error: 'Invalid signature' }), {
-            status: 401,
-            headers: { 'Content-Type': 'application/json' }
-        });
+        logger.error('stripe_webhook_security', 'Invalid Stripe signature');
+        throw new AuthenticationError('Invalid Stripe signature');
     }
 
     const event = JSON.parse(body);
@@ -163,12 +169,8 @@ export async function handleStripeWebhook(request: Request, env: Env): Promise<R
         ).bind(event.id, event.type, Date.now()).run();
 
     } catch (error: any) {
-        console.error(`Webhook processing error: ${error.message}`);
-        // Return 500 to trigger Stripe retry
-        return new Response(JSON.stringify({ error: 'Processing failed' }), {
-            status: 500,
-            headers: { 'Content-Type': 'application/json' }
-        });
+        logger.error('stripe_webhook_error', error, { eventId: event.id, eventType: event.type });
+        throw error; // Let global handler handle it
     }
 
     return new Response(JSON.stringify({ received: true }), {

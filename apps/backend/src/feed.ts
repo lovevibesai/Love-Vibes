@@ -6,6 +6,8 @@ import { Env } from './index';
 import { verifyAuth } from './auth';
 // @ts-ignore
 import { S2 } from 's2-geometry';
+import { AuthenticationError, NotFoundError, AppError } from './errors';
+import { logger } from './logger';
 
 // Production Ready S2 Logic
 // Production Ready S2 Logic
@@ -76,7 +78,7 @@ async function calculateSemanticScore(env: Env, text1: string, text2: string): P
 
 export async function handleFeed(request: Request, env: Env): Promise<Response> {
     const userId = await verifyAuth(request, env);
-    if (!userId) return new Response("Unauthorized", { status: 401 });
+    if (!userId) throw new AuthenticationError();
 
     // Get current user's profile to know their preferences
     const { results: userResults } = await env.DB.prepare(
@@ -84,7 +86,7 @@ export async function handleFeed(request: Request, env: Env): Promise<Response> 
     ).bind(userId).all();
 
     const currentUser: any = userResults[0];
-    if (!currentUser) return new Response("User not found", { status: 404 });
+    if (!currentUser) throw new NotFoundError('User');
 
     // 1. Calculate Neighbors (Geosharding)
     const currentCell = latLonToCellId(currentUser.lat || 0, currentUser.long || 0);
@@ -129,10 +131,18 @@ export async function handleFeed(request: Request, env: Env): Promise<Response> 
         };
     }));
 
+    logger.info('feed_generated', undefined, {
+        userId,
+        cellCount: cellsToQuery.length,
+        source: cachedData ? 'cache' : 'db',
+        resultsCount: feed.length
+    });
+
     return new Response(JSON.stringify({
-        meta: { status: 200, count: feed.length, source: cachedData ? 'cache' : 'db' },
+        success: true,
         data: {
-            results: feed
+            results: feed,
+            meta: { source: cachedData ? 'cache' : 'db' }
         }
     }), { headers: { 'Content-Type': 'application/json' } });
 }

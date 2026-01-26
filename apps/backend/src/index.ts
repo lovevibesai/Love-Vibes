@@ -24,6 +24,8 @@ import { handleRewind } from './rewind';
 import { handleSuccessStories } from './success-stories';
 import { handleRecovery } from './recovery';
 import { handleModeration } from './moderation';
+import { logger } from './logger';
+import { handleApiError, AppError, ServerError, ValidationError } from './errors';
 
 export { ChatRoom, MatchLobby } from './durable_objects';
 
@@ -69,11 +71,20 @@ export function trackEvent(env: Env, eventName: string, data: Record<string, any
 
 export default {
     async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+        const url = new URL(request.url);
+        const startTime = Date.now();
+        const requestId = crypto.randomUUID();
+
         const corsHeaders = {
             'Access-Control-Allow-Origin': '*',
             'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
             'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Auth-Token, CF-Turnstile-Response',
             'Access-Control-Max-Age': '86400',
+            'X-Content-Type-Options': 'nosniff',
+            'X-Frame-Options': 'DENY',
+            'X-XSS-Protection': '1; mode=block',
+            'Strict-Transport-Security': 'max-age=31536000; includeSubDomains; preload',
+            'Content-Security-Policy': "default-src 'none'; frame-ancestors 'none';",
         };
 
         if (request.method === 'OPTIONS') {
@@ -81,21 +92,41 @@ export default {
         }
 
         try {
+            logger.info('request_start', undefined, {
+                requestId,
+                method: request.method,
+                path: url.pathname,
+                ip: request.headers.get('cf-connecting-ip')
+            });
+
             const response = await handleRequest(request, env);
 
             // Create a new response with the same body and status, but with CORS headers
             const newResponse = new Response(response.body, response);
             Object.entries(corsHeaders).forEach(([k, v]) => newResponse.headers.set(k, v));
 
+            const duration = Date.now() - startTime;
+            logger.info('request_end', undefined, {
+                requestId,
+                status: response.status,
+                duration
+            });
+
             return newResponse;
         } catch (e: any) {
-            return new Response(JSON.stringify({ error: e.message }), {
-                status: 500,
-                headers: {
-                    ...corsHeaders,
-                    'Content-Type': 'application/json'
-                }
+            const duration = Date.now() - startTime;
+            logger.error('request_error', e, {
+                requestId,
+                path: url.pathname,
+                duration
             });
+
+            const response = handleApiError(e);
+
+            // Add CORS to error response too
+            const newResponse = new Response(response.body, response);
+            Object.entries(corsHeaders).forEach(([k, v]) => newResponse.headers.set(k, v));
+            return newResponse;
         }
     },
 };
@@ -119,44 +150,53 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
     const path = url.pathname;
     const method = request.method;
+    const jsonHeaders = { 'Content-Type': 'application/json' };
 
     // HEALTH CHECK ENDPOINT - Critical for monitoring
     if (path === '/health' || path === '/v2/health') {
         const secrets = verifySecrets(env);
 
-        // Test database read/write separately (D1 can partially fail)
+        // Test database read/write separately
         let dbRead = 'ok';
         let dbWrite = 'ok';
 
         if (env.DB) {
             try {
-                // Test read
                 await env.DB.prepare('SELECT 1').first();
             } catch (e) {
                 dbRead = 'error';
             }
 
             try {
-                // Test write (upsert to health check table)
+                // We should have a dedicated HealthCheck table for this
                 await env.DB.prepare(
                     'INSERT OR REPLACE INTO HealthCheck (id, timestamp) VALUES (1, ?)'
                 ).bind(Date.now()).run();
             } catch (e) {
-                // Write test table may not exist - that's ok for now
-                dbWrite = 'untested';
+                dbWrite = 'error';
             }
         } else {
             dbRead = 'missing';
             dbWrite = 'missing';
         }
 
-        const allHealthy = secrets.valid && dbRead === 'ok';
+        // Check external reachability
+        let googleAuth = 'untested';
+        try {
+            const googleRes = await fetch('https://oauth2.googleapis.com/tokeninfo', { method: 'HEAD' });
+            googleAuth = googleRes.ok || googleRes.status === 400 ? 'ok' : 'error';
+        } catch (e) {
+            googleAuth = 'error';
+        }
+
+        const allHealthy = secrets.valid && dbRead === 'ok' && googleAuth === 'ok';
         const status = allHealthy ? 'healthy' : 'degraded';
 
         return new Response(JSON.stringify({
+            success: true,
             status,
             timestamp: new Date().toISOString(),
-            version: '1.0.0',
+            version: '1.1.0',
             checks: {
                 secrets: secrets.valid ? 'ok' : `missing: ${secrets.missing.join(', ')}`,
                 database: {
@@ -164,7 +204,10 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
                     write: dbWrite
                 },
                 storage: env.MEDIA_BUCKET ? 'ok' : 'missing',
-                durableObjects: env.CHAT_ROOM ? 'ok' : 'missing'
+                durableObjects: env.CHAT_ROOM ? 'ok' : 'missing',
+                external: {
+                    googleAuth
+                }
             }
         }), {
             status: allHealthy ? 200 : 503,
@@ -177,14 +220,8 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         // Verify critical secrets before auth operations
         const secrets = verifySecrets(env);
         if (!secrets.valid) {
-            console.error(`CRITICAL: Missing secrets - ${secrets.missing.join(', ')}`);
-            return new Response(JSON.stringify({
-                error: 'Service configuration error',
-                code: 'CONFIG_ERROR'
-            }), {
-                status: 503,
-                headers: { 'Content-Type': 'application/json' }
-            });
+            logger.error('config_error', 'Missing secrets', { missing: secrets.missing });
+            throw new AppError('Service configuration error', 503, 'CONFIG_ERROR');
         }
         return await handleAuth(request, env);
     }
@@ -263,20 +300,20 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
     if (path === '/v2/referrals/stats' && method === 'GET') {
         const url = new URL(request.url);
         const userId = url.searchParams.get('userId');
-        if (!userId) return new Response('Missing userId', { status: 400 });
+        if (!userId) throw new ValidationError('Missing userId');
 
         const stats = await getReferralStats(env, userId);
         return new Response(JSON.stringify(stats), {
-            headers: { 'Content-Type': 'application/json' }
+            headers: jsonHeaders
         });
     }
     if (path === '/v2/referrals/unlock' && method === 'POST') {
         const body = await request.json() as any; // { userId, scenarioType }
-        if (!body.userId || !body.scenarioType) return new Response('Missing params', { status: 400 });
+        if (!body.userId || !body.scenarioType) throw new ValidationError('Missing userId or scenarioType');
 
         const result = await unlockScenario(env, body.userId, body.scenarioType);
         return new Response(JSON.stringify(result), {
-            headers: { 'Content-Type': 'application/json' }
+            headers: jsonHeaders
         });
     }
 
