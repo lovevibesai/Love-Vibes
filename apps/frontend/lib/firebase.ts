@@ -38,3 +38,18 @@ import { getAuth, GoogleAuthProvider } from "firebase/auth";
 
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
+
+// Firebase Cloud Messaging (Push Notifications)
+import { getMessaging, isSupported as isMessagingSupported } from "firebase/messaging";
+
+export const VAPID_KEY = "cM6EgnZR1GW-mfC1VGrhjey9ACTMsUY6eaRK6QTYKu0";
+
+export const initMessaging = async () => {
+    if (typeof window !== "undefined") {
+        const supported = await isMessagingSupported();
+        if (supported) {
+            return getMessaging(app);
+        }
+    }
+    return null;
+};
