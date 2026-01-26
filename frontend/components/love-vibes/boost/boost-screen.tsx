@@ -7,7 +7,7 @@ import { ChevronLeft, Zap, TrendingUp, Clock, Sparkles } from "lucide-react"
 import { loveVibesAPI } from "@/lib/love-vibes-api"
 
 export function BoostScreen() {
-    const { setCurrentScreen, user, setCurrentUser } = useApp()
+    const { setCurrentScreen, user, updateUser } = useApp()
     const [isActive, setIsActive] = useState(false)
     const [timeRemaining, setTimeRemaining] = useState(30)
     const [loading, setLoading] = useState(false)
@@ -21,7 +21,7 @@ export function BoostScreen() {
             await loveVibesAPI.boost.activate(user.id)
 
             // Deduct credits
-            setCurrentUser({ ...user, credits: user.credits - 50 })
+            updateUser({ credits: user.credits - 50 })
 
             setIsActive(true)
 

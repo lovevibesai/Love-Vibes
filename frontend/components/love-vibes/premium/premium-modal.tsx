@@ -13,7 +13,7 @@ interface PremiumModalProps {
 }
 
 export function PremiumModal({ isOpen, onClose }: PremiumModalProps) {
-    const { currentUser, setCurrentUser } = useApp()
+    const { user, updateUser } = useApp()
     const [selectedTier, setSelectedTier] = useState<'plus' | 'platinum'>('plus')
     const [isLoading, setIsLoading] = useState(false)
 
@@ -54,9 +54,8 @@ export function PremiumModal({ isOpen, onClose }: PremiumModalProps) {
         try {
             const res = await api.billing.subscribe(selectedTier, 'monthly')
             if (res.status === "success") {
-                if (currentUser) {
-                    setCurrentUser({
-                        ...currentUser,
+                if (user) {
+                    updateUser({
                         subscriptionTier: selectedTier,
                         subscriptionExpiresAt: res.expires_at
                     })

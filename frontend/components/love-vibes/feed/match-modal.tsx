@@ -11,7 +11,7 @@ interface MatchModalProps {
 }
 
 export function MatchModal({ user }: MatchModalProps) {
-  const { setShowMatchModal, setCurrentScreen, currentUser } = useApp()
+  const { setShowMatchModal, setCurrentScreen, user: currentUser } = useApp()
   const [showConfetti, setShowConfetti] = useState(false)
   const [isAnimating, setIsAnimating] = useState(true)
 

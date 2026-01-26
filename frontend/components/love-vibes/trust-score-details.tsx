@@ -4,11 +4,11 @@ import React from "react"
 
 import { TrustScore } from "./trust-score"
 import { Button } from "@/components/ui/button"
-import { 
-  X, 
-  Shield, 
-  CheckCircle, 
-  MessageCircle, 
+import {
+  X,
+  Shield,
+  CheckCircle,
+  MessageCircle,
   Camera,
   Calendar,
   Star
@@ -109,7 +109,7 @@ export function TrustScoreDetails({ score, onClose, isOwnProfile = false }: Trus
         <div className="flex-1 overflow-y-auto p-5">
           {/* Score Display */}
           <div className="flex flex-col items-center mb-6">
-            <TrustScore score={score} size="xl" showLabel={false} />
+            <TrustScore score={score} size="lg" showLabel={false} />
             <p className={`mt-3 text-lg font-semibold ${level.color}`}>{level.label}</p>
             <p className="text-sm text-muted-foreground mt-1">
               {isOwnProfile ? "Your trust level" : "This user's trust level"}
@@ -120,7 +120,7 @@ export function TrustScoreDetails({ score, onClose, isOwnProfile = false }: Trus
           <div className="p-4 bg-muted rounded-xl mb-6">
             <h3 className="font-semibold text-foreground mb-2">What is Trust Score?</h3>
             <p className="text-sm text-muted-foreground leading-relaxed">
-              Trust Score reflects how reliable and genuine a member is based on their verification status, 
+              Trust Score reflects how reliable and genuine a member is based on their verification status,
               activity, and community interactions. Higher scores indicate more trustworthy profiles.
             </p>
           </div>
@@ -130,19 +130,17 @@ export function TrustScoreDetails({ score, onClose, isOwnProfile = false }: Trus
             <h3 className="font-semibold text-foreground mb-4">Score Breakdown</h3>
             <div className="space-y-3">
               {factors.map((factor, index) => (
-                <div 
+                <div
                   key={index}
-                  className={`p-4 rounded-xl border ${
-                    factor.completed 
-                      ? "bg-trust-high/5 border-trust-high/20" 
+                  className={`p-4 rounded-xl border ${factor.completed
+                      ? "bg-trust-high/5 border-trust-high/20"
                       : "bg-card border-border"
-                  }`}
+                    }`}
                 >
                   <div className="flex items-start justify-between">
                     <div className="flex items-start gap-3">
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                        factor.completed ? "bg-trust-high/10 text-trust-high" : "bg-muted text-muted-foreground"
-                      }`}>
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center ${factor.completed ? "bg-trust-high/10 text-trust-high" : "bg-muted text-muted-foreground"
+                        }`}>
                         {factor.icon}
                       </div>
                       <div>
@@ -150,9 +148,8 @@ export function TrustScoreDetails({ score, onClose, isOwnProfile = false }: Trus
                         <p className="text-sm text-muted-foreground">{factor.description}</p>
                       </div>
                     </div>
-                    <span className={`text-sm font-semibold ${
-                      factor.completed ? "text-trust-high" : "text-muted-foreground"
-                    }`}>
+                    <span className={`text-sm font-semibold ${factor.completed ? "text-trust-high" : "text-muted-foreground"
+                      }`}>
                       +{factor.points}/{factor.maxPoints}
                     </span>
                   </div>

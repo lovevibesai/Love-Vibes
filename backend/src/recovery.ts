@@ -86,3 +86,59 @@ async function hashPassword(password: string): Promise<string> {
         .map(b => b.toString(16).padStart(2, '0'))
         .join('')
 }
+
+// HTTP Handler for recovery routes
+export async function handleRecovery(request: Request, env: Env): Promise<Response> {
+    const url = new URL(request.url);
+    const path = url.pathname;
+    const method = request.method;
+
+    // POST /v2/recovery/request - Request password reset
+    if (path.endsWith('/request') && method === 'POST') {
+        try {
+            const body = await request.json() as any;
+            if (!body.email) {
+                return new Response(JSON.stringify({ error: 'Missing email' }), {
+                    status: 400,
+                    headers: { 'Content-Type': 'application/json' }
+                });
+            }
+
+            const result = await requestPasswordReset(env, body.email);
+            return new Response(JSON.stringify(result), {
+                headers: { 'Content-Type': 'application/json' }
+            });
+        } catch (error) {
+            return new Response(JSON.stringify({ error: 'Invalid request' }), {
+                status: 400,
+                headers: { 'Content-Type': 'application/json' }
+            });
+        }
+    }
+
+    // POST /v2/recovery/reset - Reset password with token
+    if (path.endsWith('/reset') && method === 'POST') {
+        try {
+            const body = await request.json() as any;
+            if (!body.token || !body.new_password) {
+                return new Response(JSON.stringify({ error: 'Missing token or new_password' }), {
+                    status: 400,
+                    headers: { 'Content-Type': 'application/json' }
+                });
+            }
+
+            const result = await resetPassword(env, body.token, body.new_password);
+            return new Response(JSON.stringify(result), {
+                status: result.success ? 200 : 400,
+                headers: { 'Content-Type': 'application/json' }
+            });
+        } catch (error) {
+            return new Response(JSON.stringify({ error: 'Invalid request' }), {
+                status: 400,
+                headers: { 'Content-Type': 'application/json' }
+            });
+        }
+    }
+
+    return new Response('Method not allowed', { status: 405 });
+}

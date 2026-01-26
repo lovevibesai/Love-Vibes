@@ -25,7 +25,7 @@ export function IcebreakerPanel({ withUserId, onSelect, onClose }: IcebreakerPan
         } catch (err) {
             console.error("Failed to fetch icebreakers:", err)
         } finally {
-            setIsLoading(null)
+            setIsLoading(false)
         }
     }
 

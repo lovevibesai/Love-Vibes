@@ -1,157 +1,141 @@
-# 💖 Love Vibes
+# Love Vibes ❤️
 
-<div align="center">
+## Repository Overview
 
-![Love Vibes Logo](./docs/assets/branding/LOVE%20VIBES%20LOGO.png)
+**Love Vibes** is a production-grade, privacy-first dating platform built on Cloudflare's edge infrastructure. This repository contains the complete source code for backend services, frontend web application, and mobile shell, organized as a single monorepo for clarity, consistency, and operational discipline.
 
-**Next-Generation Dating & Social Networking Platform**
-
-[![Next.js](https://img.shields.io/badge/Next.js-16.0-black)](https://nextjs.org/)
-[![Cloudflare Workers](https://img.shields.io/badge/Cloudflare-Workers-orange)](https://workers.cloudflare.com/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue)](https://www.typescriptlang.org/)
-
-[Features](#-features) • [Tech Stack](#-tech-stack) • [Getting Started](#-getting-started) • [Architecture](#-architecture) • [Development](#-development)
-
-</div>
+> **Repository Visibility:** Private  
+> **License:** Proprietary (All rights reserved)  
+> **Audience:** Internal team only
 
 ---
 
-## 🌟 Overview
+## Tech Stack
 
-Love Vibes is a next-generation dating and social networking platform. This repository contains the proprietary source code for the Love Vibes ecosystem, including the Next.js frontend and Cloudflare Workers backend.
-
-> [!IMPORTANT]
-> **Proprietary & Confidential**: All code within this repository is the property of Love Vibes AI. Unauthorized copying, distribution, or use of this software is strictly prohibited.
-
----
-
-## ✨ Features
-
-### 🎯 Core Features
-- **AI-Powered Matching** - Sophisticated compatibility algorithms using personality, interests, and behavioral patterns.
-- **Video Profiles** - 15-second video introductions with AI quality verification.
-- **Blockchain Verification** - Multi-level identity verification with trust scoring.
-- **Real-Time Chat** - Instant messaging with Durable Objects for low-latency communication.
-- **Smart Discovery** - Location-based matching with advanced filtering options.
-
-### 💎 Premium Features
-- **Profile Boost** - Increase visibility in discovery feed.
-- **Vibe Windows** - Time-limited matching events with enhanced rewards.
-- **Chemistry Quiz** - Deep compatibility assessment.
-- **Voice Matching** - Audio-based profile enhancement.
-- **Mutual Friends** - See shared connections (privacy-controlled).
-
-### 🛡️ Safety & Security
-- **AI Moderation** - Automated content screening and safety checks.
-- **Photo Verification** - Selfie verification to prevent catfishing.
-- **Privacy Controls** - Granular control over profile visibility.
+| Layer | Technology |
+|-------|------------|
+| **Backend** | Cloudflare Workers, Durable Objects, D1, R2 |
+| **Frontend** | Next.js (Cloudflare Pages) |
+| **Mobile** | Capacitor (Android / iOS) |
+| **Auth** | Email OTP, Passkeys (WebAuthn), OAuth |
+| **Payments** | Stripe |
+| **Security** | Cloudflare WAF, Turnstile, Rate Limiting |
 
 ---
 
-## 🚀 Tech Stack
+## Monorepo Structure
 
-### Frontend
-- **Framework**: Next.js 16 with React 19
-- **Styling**: Tailwind CSS 4.1 with custom design system
-- **UI Components**: Radix UI primitives
-- **Animations**: Framer Motion
+```
+love-vibes/
+│
+├── backend/               # Cloudflare Workers API & WebSockets
+│   ├── src/              # TypeScript source
+│   ├── schema.sql        # D1 database schema
+│   └── wrangler.toml     # Worker configuration
+│
+├── frontend/              # Next.js web client (Pages)
+│   ├── app/              # Next.js app router
+│   ├── components/       # React components
+│   └── lib/              # Utilities & API client
+│
+├── docs/                  # Internal documentation
+│   ├── architecture.md
+│   ├── deployment.md
+│   ├── security.md
+│   └── runbook.md
+│
+├── .github/               # GitHub templates
+│   ├── CODEOWNERS
+│   ├── PULL_REQUEST_TEMPLATE.md
+│   └── ISSUE_TEMPLATE.md
+│
+├── .editorconfig
+├── .gitignore
+├── README.md
+└── LICENSE
+```
+
+---
+
+## Development Principles
+
+- **Main branch is always deployable**
+- No direct commits to `main`
+- All changes via pull requests
+- Clear, intentional commit history
+- Secrets never committed to Git
+
+---
+
+## Branching Strategy
+
+```
+main            → production-ready
+feature/*       → new features
+fix/*           → bug fixes
+hotfix/*        → production emergencies
+```
+
+---
+
+## Quick Start
 
 ### Backend
-- **Runtime**: Cloudflare Workers (serverless edge computing)
-- **Database**: Cloudflare D1 (SQLite at the edge)
-- **Storage**: Cloudflare R2 (object storage for media)
-- **Real-time**: Durable Objects (stateful WebSocket connections)
-- **KV**: Cloudflare KV for geosharding and caching
 
----
-
-## 📁 Project Structure
-
+```bash
+cd backend
+npm install
+npm run dev
 ```
-Love Vibes/
-├── frontend/                 # Next.js application
-│   ├── app/                 # App router pages
-│   ├── components/          # React components
-│   ├── hooks/              # Custom React hooks
-│   └── lib/                # Utility functions
-├── src/                     # Cloudflare Workers backend
-│   ├── index.ts            # Main worker entry point
-│   └── durable_objects.ts  # Real-time chat rooms
-├── migrations/              # D1 database migrations
-├── docs/                    # Documentation
-│   ├── ARCHITECTURE.md     # System architecture
-│   ├── DEPLOYMENT.md       # Deployment guide
-│   └── API.md              # API documentation
-├── schema.sql              # Database schema
-├── wrangler.toml           # Cloudflare Workers config
-└── package.json            # Dependencies
+
+### Frontend
+
+```bash
+cd frontend
+npm install
+npm run dev
 ```
 
 ---
 
-## 🏃 Getting Started
+## Deployment
 
-This section is for authorized developers with infrastructure access.
+| Service | Platform |
+|---------|----------|
+| Backend | Cloudflare Workers |
+| Frontend | Cloudflare Pages |
+| Database | D1 |
+| Media | R2 |
 
-### Prerequisites
-- Node.js 18+ and npm
-- Cloudflare account (authorized access)
-- Git
-
-### Local Development
-1. **Clone & Install**
-   ```bash
-   git clone https://github.com/lovevibesai/LoveVibes.git
-   npm install && cd frontend && npm install && cd ..
-   ```
-2. **Setup Env**
-   ```bash
-   cp .env.example .env.local
-   cd frontend && cp .env.example .env.local && cd ..
-   ```
-3. **Run**
-   ```bash
-   # Frontend: npm run dev (in /frontend)
-   # Backend: npx wrangler dev
-   ```
+See `docs/deployment.md` for the production checklist.
 
 ---
 
-## 🏗️ Architecture
+## Security
 
-Love Vibes uses a modern edge-first architecture with Next.js on Cloudflare Pages and a suite of Cloudflare services (D1, R2, Durable Objects) for the backend. Detailed docs are in [ARCHITECTURE.md](./docs/ARCHITECTURE.md).
+This repository is **private** and for authorized contributors only.
 
----
+- Secrets managed via Cloudflare environment variables
+- Stripe webhooks signature-verified
+- Rate limiting and WAF protection enabled
+- AI moderation for content safety
 
-## 📚 Documentation
-
-- [Architecture Overview](./docs/ARCHITECTURE.md)
-- [API Documentation](./docs/API.md)
-- [Deployment Guide](./docs/DEPLOYMENT.md)
-- [Development Guide](./DEVELOPMENT_GUIDE.md)
-- [Security Policy](./SECURITY.md)
+See `docs/security.md` for details.
 
 ---
 
-## 🛠️ Development
+## License
 
-Development access is restricted to authorized team members. Refer to the [Internal Development Guide](./DEVELOPMENT_GUIDE.md) for coding standards and internal procedures.
+This software is proprietary and confidential.
 
----
+Unauthorized copying, modification, distribution, or use of this software is strictly prohibited.
 
-## 📄 License
-
-**Proprietary & Confidential. All Rights Reserved.**
-Unauthorized use, reproduction, or distribution is strictly prohibited. For inquiries, contact licensing@lovevibes.ai.
-
-## 📞 Contact
-- **Website**: [lovevibes.ai](https://lovevibes.ai)
-- **Support**: support@lovevibes.ai
+See the `LICENSE` file for full terms.
 
 ---
 
-<div align="center">
+## Status
 
-**Internal Proprietary Codebase © Love Vibes Team**
+**Production-ready.**
 
-</div>
+This repository reflects a hardened v1 system designed for real-world deployment, monitoring, and iteration.

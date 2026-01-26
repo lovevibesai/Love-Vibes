@@ -19,7 +19,7 @@ interface CreditPackage {
 }
 
 export function CreditsScreen() {
-    const { setCurrentScreen, currentUser, setCurrentUser } = useApp()
+    const { setCurrentScreen, user, updateUser } = useApp()
     const [isLoading, setIsLoading] = useState<string | null>(null)
     const [successPackage, setSuccessPackage] = useState<CreditPackage | null>(null)
 
@@ -68,10 +68,9 @@ export function CreditsScreen() {
             const res = await api.billing.purchaseCredits(pkg.id)
             if (res.status === "success") {
                 // Update local state
-                if (currentUser) {
-                    setCurrentUser({
-                        ...currentUser,
-                        credits: (currentUser.credits || 0) + res.credits_added
+                if (user) {
+                    updateUser({
+                        credits: (user.credits || 0) + res.credits_added
                     })
                 }
                 setSuccessPackage(pkg)
@@ -96,7 +95,7 @@ export function CreditsScreen() {
                     </button>
                     <div className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-rose-500/10 to-purple-500/10 border border-white/10 rounded-full">
                         <Sparkles className="w-4 h-4 text-rose-500" />
-                        <span className="font-bold text-lg">{currentUser?.credits || 0}</span>
+                        <span className="font-bold text-lg">{user?.credits || 0}</span>
                         <span className="text-xs text-zinc-400 font-medium">CREDITS</span>
                     </div>
                     <div className="w-10 h-10" /> {/* Spacer */}

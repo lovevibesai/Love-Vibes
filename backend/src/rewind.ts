@@ -97,3 +97,36 @@ export async function undoLastSwipe(
         return { success: false, message: 'Failed to undo swipe' }
     }
 }
+
+// HTTP Handler for rewind routes
+export async function handleRewind(request: Request, env: Env): Promise<Response> {
+    const method = request.method;
+
+    if (method === 'POST') {
+        try {
+            const body = await request.json() as any;
+            const userId = body.user_id;
+            const isPremium = body.is_premium || false;
+
+            if (!userId) {
+                return new Response(JSON.stringify({ error: 'Missing user_id' }), {
+                    status: 400,
+                    headers: { 'Content-Type': 'application/json' }
+                });
+            }
+
+            const result = await undoLastSwipe(env, userId, isPremium);
+            return new Response(JSON.stringify(result), {
+                status: result.success ? 200 : 400,
+                headers: { 'Content-Type': 'application/json' }
+            });
+        } catch (error) {
+            return new Response(JSON.stringify({ error: 'Invalid request' }), {
+                status: 400,
+                headers: { 'Content-Type': 'application/json' }
+            });
+        }
+    }
+
+    return new Response('Method not allowed', { status: 405 });
+}

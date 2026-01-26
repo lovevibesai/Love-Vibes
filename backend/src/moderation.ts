@@ -151,3 +151,76 @@ export async function getModerationStats(env: Env, adminId: string): Promise<any
 
     return stats
 }
+
+// HTTP Handler for moderation routes
+export async function handleModeration(request: Request, env: Env): Promise<Response> {
+    const url = new URL(request.url);
+    const path = url.pathname;
+    const method = request.method;
+
+    // Get admin ID from header
+    const adminId = request.headers.get('X-Auth-Token') || url.searchParams.get('admin_id');
+
+    if (!adminId) {
+        return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+            status: 401,
+            headers: { 'Content-Type': 'application/json' }
+        });
+    }
+
+    // GET /v2/admin/moderation/reports - Get pending reports
+    if (path.endsWith('/reports') && method === 'GET') {
+        try {
+            const reports = await getPendingReports(env, adminId);
+            return new Response(JSON.stringify({ status: 'success', reports }), {
+                headers: { 'Content-Type': 'application/json' }
+            });
+        } catch (error: any) {
+            return new Response(JSON.stringify({ error: error.message }), {
+                status: 403,
+                headers: { 'Content-Type': 'application/json' }
+            });
+        }
+    }
+
+    // POST /v2/admin/moderation/review - Review a report
+    if (path.endsWith('/review') && method === 'POST') {
+        try {
+            const body = await request.json() as any;
+            if (!body.report_id || !body.action) {
+                return new Response(JSON.stringify({ error: 'Missing report_id or action' }), {
+                    status: 400,
+                    headers: { 'Content-Type': 'application/json' }
+                });
+            }
+
+            const result = await reviewReport(env, adminId, body.report_id, body.action, body.notes || '');
+            return new Response(JSON.stringify(result), {
+                status: result.success ? 200 : 400,
+                headers: { 'Content-Type': 'application/json' }
+            });
+        } catch (error) {
+            return new Response(JSON.stringify({ error: 'Invalid request' }), {
+                status: 400,
+                headers: { 'Content-Type': 'application/json' }
+            });
+        }
+    }
+
+    // GET /v2/admin/moderation/stats - Get moderation stats
+    if (path.endsWith('/stats') && method === 'GET') {
+        try {
+            const stats = await getModerationStats(env, adminId);
+            return new Response(JSON.stringify({ status: 'success', stats }), {
+                headers: { 'Content-Type': 'application/json' }
+            });
+        } catch (error: any) {
+            return new Response(JSON.stringify({ error: error.message }), {
+                status: 403,
+                headers: { 'Content-Type': 'application/json' }
+            });
+        }
+    }
+
+    return new Response('Method not allowed', { status: 405 });
+}

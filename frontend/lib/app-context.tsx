@@ -60,7 +60,7 @@ export interface User {
   distance?: string
 }
 
-interface Match {
+export interface Match {
   id: string
   user: User
   lastMessage?: string

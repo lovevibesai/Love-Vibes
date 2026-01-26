@@ -29,9 +29,9 @@ interface GiftSheetProps {
 }
 
 export function GiftSheet({ onClose, onSendGift }: GiftSheetProps) {
-  const { currentUser } = useApp()
+  const { user } = useApp()
   const [selectedGift, setSelectedGift] = useState<Gift | null>(null)
-  const credits = currentUser?.credits || 100
+  const credits = user?.credits || 100
 
   const handleSend = () => {
     if (selectedGift && credits >= selectedGift.cost) {

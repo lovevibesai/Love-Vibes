@@ -86,3 +86,51 @@ export async function getSuccessStories(env: Env, limit: number = 20): Promise<S
 
     return results.results as unknown as SuccessStory[]
 }
+
+// HTTP Handler for success stories routes
+export async function handleSuccessStories(request: Request, env: Env): Promise<Response> {
+    const url = new URL(request.url);
+    const method = request.method;
+
+    // GET /v2/success-stories - Get approved stories
+    if (method === 'GET') {
+        const limit = parseInt(url.searchParams.get('limit') || '20');
+        const stories = await getSuccessStories(env, limit);
+        return new Response(JSON.stringify({ status: 'success', stories }), {
+            headers: { 'Content-Type': 'application/json' }
+        });
+    }
+
+    // POST /v2/success-stories - Submit a story
+    if (method === 'POST') {
+        try {
+            const body = await request.json() as any;
+            const userId = body.user_id;
+
+            if (!userId || !body.partner_id || !body.story_text) {
+                return new Response(JSON.stringify({ error: 'Missing required fields' }), {
+                    status: 400,
+                    headers: { 'Content-Type': 'application/json' }
+                });
+            }
+
+            const result = await submitSuccessStory(env, userId, {
+                partner_id: body.partner_id,
+                story_text: body.story_text,
+                relationship_length: body.relationship_length || ''
+            });
+
+            return new Response(JSON.stringify(result), {
+                status: result.success ? 200 : 400,
+                headers: { 'Content-Type': 'application/json' }
+            });
+        } catch (error) {
+            return new Response(JSON.stringify({ error: 'Invalid request' }), {
+                status: 400,
+                headers: { 'Content-Type': 'application/json' }
+            });
+        }
+    }
+
+    return new Response('Method not allowed', { status: 405 });
+}

@@ -1,0 +1,10 @@
+﻿components/love-vibes/boost/boost-screen.tsx(10,37): error TS2339: Property 'setCurrentUser' does not exist on type 'AppContextType'.
+components/love-vibes/chat/gift-sheet.tsx(32,11): error TS2339: Property 'currentUser' does not exist on type 'AppContextType'.
+components/love-vibes/chat/icebreaker-panel.tsx(28,26): error TS2345: Argument of type 'null' is not assignable to parameter of type 'SetStateAction<boolean>'.
+components/love-vibes/credits/credits-screen.tsx(22,31): error TS2339: Property 'currentUser' does not exist on type 'AppContextType'.
+components/love-vibes/credits/credits-screen.tsx(22,44): error TS2339: Property 'setCurrentUser' does not exist on type 'AppContextType'.
+components/love-vibes/feed/match-modal.tsx(14,48): error TS2339: Property 'currentUser' does not exist on type 'AppContextType'.
+components/love-vibes/matches/matches-screen.tsx(3,23): error TS2459: Module '"@/lib/app-context"' declares 'Match' locally, but it is not exported.
+components/love-vibes/premium/premium-modal.tsx(16,13): error TS2339: Property 'currentUser' does not exist on type 'AppContextType'.
+components/love-vibes/premium/premium-modal.tsx(16,26): error TS2339: Property 'setCurrentUser' does not exist on type 'AppContextType'.
+components/love-vibes/trust-score-details.tsx(112,39): error TS2322: Type '"xl"' is not assignable to type '"sm" | "lg" | "md" | undefined'.

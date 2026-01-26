@@ -7,7 +7,7 @@ import { handleFeed } from './feed';
 import { handleSwipe } from './swipe';
 import { handleUserUpdate } from './user';
 import { handleGifting } from './gifting';
-import { handleBilling } from './billing';
+import { handleBilling, handleStripeWebhook } from './billing';
 import { handleChatAI } from './chat';
 import { handleReportUser, handleBlockUser } from './safety';
 import { handleMedia } from './media';
@@ -20,6 +20,10 @@ import { handleProximity } from './proximity';
 import { handleBoost } from './boost';
 import { handleMutualFriends } from './mutual-friends';
 import { handleNotifications } from './notifications';
+import { handleRewind } from './rewind';
+import { handleSuccessStories } from './success-stories';
+import { handleRecovery } from './recovery';
+import { handleModeration } from './moderation';
 
 export { ChatRoom, MatchLobby } from './durable_objects';
 
@@ -96,13 +100,92 @@ export default {
     },
 };
 
+/**
+ * CRITICAL: Verify all required secrets are present
+ * Call this at the start of auth-related operations
+ */
+function verifySecrets(env: Env): { valid: boolean; missing: string[] } {
+    const missing: string[] = [];
+
+    if (!env.JWT_SECRET) missing.push('JWT_SECRET');
+    if (!env.DB) missing.push('DB (D1 Database)');
+    if (!env.MEDIA_BUCKET) missing.push('MEDIA_BUCKET (R2)');
+    if (!env.CHAT_ROOM) missing.push('CHAT_ROOM (Durable Object)');
+
+    return { valid: missing.length === 0, missing };
+}
+
 async function handleRequest(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
     const path = url.pathname;
     const method = request.method;
 
+    // HEALTH CHECK ENDPOINT - Critical for monitoring
+    if (path === '/health' || path === '/v2/health') {
+        const secrets = verifySecrets(env);
+
+        // Test database read/write separately (D1 can partially fail)
+        let dbRead = 'ok';
+        let dbWrite = 'ok';
+
+        if (env.DB) {
+            try {
+                // Test read
+                await env.DB.prepare('SELECT 1').first();
+            } catch (e) {
+                dbRead = 'error';
+            }
+
+            try {
+                // Test write (upsert to health check table)
+                await env.DB.prepare(
+                    'INSERT OR REPLACE INTO HealthCheck (id, timestamp) VALUES (1, ?)'
+                ).bind(Date.now()).run();
+            } catch (e) {
+                // Write test table may not exist - that's ok for now
+                dbWrite = 'untested';
+            }
+        } else {
+            dbRead = 'missing';
+            dbWrite = 'missing';
+        }
+
+        const allHealthy = secrets.valid && dbRead === 'ok';
+        const status = allHealthy ? 'healthy' : 'degraded';
+
+        return new Response(JSON.stringify({
+            status,
+            timestamp: new Date().toISOString(),
+            version: '1.0.0',
+            checks: {
+                secrets: secrets.valid ? 'ok' : `missing: ${secrets.missing.join(', ')}`,
+                database: {
+                    read: dbRead,
+                    write: dbWrite
+                },
+                storage: env.MEDIA_BUCKET ? 'ok' : 'missing',
+                durableObjects: env.CHAT_ROOM ? 'ok' : 'missing'
+            }
+        }), {
+            status: allHealthy ? 200 : 503,
+            headers: { 'Content-Type': 'application/json' }
+        });
+    }
+
     // 1. Auth Routes
     if (path.startsWith('/v2/auth')) {
+        // Verify critical secrets before auth operations
+        const secrets = verifySecrets(env);
+        if (!secrets.valid) {
+            console.error(`CRITICAL: Missing secrets - ${secrets.missing.join(', ')}`);
+            return new Response(JSON.stringify({
+                error: 'Service configuration error',
+                code: 'CONFIG_ERROR'
+            }), {
+                status: 503,
+                headers: { 'Content-Type': 'application/json' }
+            });
+        }
         return await handleAuth(request, env);
     }
 
@@ -111,7 +194,12 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         return await handleFeed(request, env);
     }
 
-    // 3. Billing & Monetization
+    // 3. Stripe Webhook (NO AUTH - server-to-server, signature verified internally)
+    if (path === '/v2/billing/webhook' && method === 'POST') {
+        return await handleStripeWebhook(request, env);
+    }
+
+    // 4. Billing & Monetization
     if (path.startsWith('/v2/billing')) {
         return await handleBilling(request, env);
     }
@@ -225,6 +313,26 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
     // 18. Push Notifications
     if (path.startsWith('/v2/notifications')) {
         return await handleNotifications(request, env);
+    }
+
+    // 19. Rewind Feature
+    if (path.startsWith('/v2/rewind')) {
+        return await handleRewind(request, env);
+    }
+
+    // 20. Success Stories
+    if (path.startsWith('/v2/success-stories')) {
+        return await handleSuccessStories(request, env);
+    }
+
+    // 21. Account Recovery
+    if (path.startsWith('/v2/recovery')) {
+        return await handleRecovery(request, env);
+    }
+
+    // 22. Admin Moderation
+    if (path.startsWith('/v2/admin/moderation')) {
+        return await handleModeration(request, env);
     }
 
     // 8. Durable Object Routes (Chat / WebSocket)

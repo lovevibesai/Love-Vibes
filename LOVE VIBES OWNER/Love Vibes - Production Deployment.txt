@@ -1,0 +1,328 @@
+Love Vibes - Production Deployment Checklist
+Last Updated: January 26, 2026
+Status: Ready for Production Deployment
+
+2. BACKEND – FINAL CHECKLIST & ACTIONS
+2.2 Environment Variables & Secrets (CRITICAL)
+Where: Cloudflare Workers → Settings → Variables & Secrets
+
+Required Secrets
+Secret	Purpose	Required
+JWT_SECRET	Token signing for authentication	✅ REQUIRED
+TURNSTILE_SECRET	Cloudflare Turnstile bot protection	✅ REQUIRED
+RESEND_API_KEY	Email sending (OTP, notifications)	✅ REQUIRED
+GOOGLE_CLIENT_ID	Google OAuth authentication	⚠️ If OAuth enabled
+STRIPE_SECRET_KEY	Payment processing	⚠️ If billing live
+Actions
+ Generate JWT_SECRET - Use a strong random string (32+ chars)
+openssl rand -base64 32
+ Set up Cloudflare Turnstile - Get secret from Cloudflare Dashboard → Turnstile
+ Create Resend account - Get API key from resend.com
+ Configure Google OAuth - Set up in Google Cloud Console if using Google login
+ Set up Stripe - Get secret key from Stripe Dashboard (use test key for staging)
+ Add all secrets to Cloudflare Workers:
+wrangler secret put JWT_SECRET
+wrangler secret put TURNSTILE_SECRET
+wrangler secret put RESEND_API_KEY
+wrangler secret put GOOGLE_CLIENT_ID
+wrangler secret put STRIPE_SECRET_KEY
+2.3 Database (D1)
+Actions
+ Create D1 Database (if not exists):
+wrangler d1 create love-vibes-db
+ Update wrangler.toml with database ID
+ Run migrations:
+wrangler d1 execute love-vibes-db --file=./schema.sql
+ Verify database binding in wrangler.toml:
+[[d1_databases]]
+binding = "DB"
+database_name = "love-vibes-db"
+database_id = "<your-database-id>"
+Recommended Tables to Spot Check
+Table	Check	Status
+Users
+Verify columns, indexes, constraints	[ ]
+Matches
+Check foreign keys, timestamps	[ ]
+Swipes	Verify actor_id, target_id indexes	[ ]
+Transactions	Check payment records structure	[ ]
+Reports
+Verify moderation fields	[ ]
+RateLimits
+Check rate limiting table exists	[ ]
+Credentials	WebAuthn credentials storage	[ ]
+VibeWindows
+Scheduled matching windows	[ ]
+SuccessStories
+User testimonials	[ ]
+ Spot check table creation:
+wrangler d1 execute love-vibes-db --command="SELECT name FROM sqlite_master WHERE type='table'"
+2.4 Media & CDN (R2)
+Actions
+ Create R2 Bucket (if not exists):
+wrangler r2 bucket create love-vibes-media
+ Configure R2 binding in wrangler.toml:
+[[r2_buckets]]
+binding = "MEDIA_BUCKET"
+bucket_name = "love-vibes-media"
+ Set up public access (for CDN):
+Go to R2 → love-vibes-media → Settings → Public Access
+Enable public access or set up custom domain
+ Configure CORS for bucket:
+{
+  "AllowedOrigins": ["https://love-vibes-frontend.pages.dev", "https://lovevibes.app"],
+  "AllowedMethods": ["GET", "PUT", "POST"],
+  "AllowedHeaders": ["*"],
+  "MaxAgeSeconds": 3600
+}
+ Verify upload endpoint works - Test /v2/media/upload
+ Check CDN caching - Verify images load quickly
+2.5 WebSocket & Durable Objects
+Actions
+ Verify Durable Object bindings in wrangler.toml:
+[durable_objects]
+bindings = [
+  { name = "CHAT_ROOM", class_name = "ChatRoom" },
+  { name = "MATCH_LOBBY", class_name = "MatchLobby" }
+]
+[[migrations]]
+tag = "v1"
+new_classes = ["ChatRoom", "MatchLobby"]
+ Test WebSocket connection:
+const ws = new WebSocket('wss://love-vibes-backend.workers.dev/ws/chat?match_id=test');
+ws.onopen = () => console.log('Connected!');
+ Verify message persistence - Messages should persist across reconnects
+ Check connection limits - Durable Objects have 100 concurrent connections per object
+ Monitor DO metrics in Cloudflare Dashboard → Workers → Durable Objects
+2.6 Security & Abuse Protection
+Actions
+ Enable Cloudflare Web Application Firewall (WAF)
+Dashboard → Security → WAF
+Enable managed rules
+ Configure rate limiting:
+ Auth endpoints: 5 requests/minute per IP
+ API endpoints: 100 requests/minute per user
+ Swipe endpoints: 200 requests/minute per user
+ Set up Turnstile on frontend registration/login forms
+ Verify CORS headers are properly set:
+Access-Control-Allow-Origin: https://lovevibes.app
+Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS
+Access-Control-Allow-Headers: Content-Type, Authorization, X-Auth-Token
+ Enable Bot Fight Mode - Dashboard → Security → Bots
+ Set up DDoS protection - Enabled by default on Cloudflare
+ Review Content Moderation - AI moderation in 
+moderation.ts
+ Test report/block functionality - Verify /v2/safety/* endpoints
+2.7 Observability (RECOMMENDED)
+Actions
+ Set up Analytics Engine - Already configured as LV_AI binding
+ Configure Workers Logs:
+Dashboard → Workers → love-vibes-backend → Logs
+Enable Real-time Logs
+ Set up alerting:
+Dashboard → Notifications → Create Notification
+Alert on: Error rate > 5%, Request latency > 2s
+ Monitor key metrics:
+ Request volume
+ Error rates (4xx, 5xx)
+ Latency (p50, p95, p99)
+ D1 query performance
+ R2 bandwidth usage
+ Set up Logflare or Sentry (optional but recommended):
+// Add to error handler in index.ts
+console.error(JSON.stringify({ error: e.message, timestamp: Date.now() }));
+ Create dashboard for key business metrics:
+Daily active users
+Swipes per day
+Match rate
+Message volume
+3. FRONTEND – FINAL CHECKLIST & ACTIONS
+3.1 Build & Deployment
+Actions
+ Test production build locally:
+cd frontend
+npm run build
+ Deploy to Cloudflare Pages:
+npm run pages:deploy
+ Verify deployment URL - Check https://love-vibes-frontend.pages.dev
+ Set up custom domain (if applicable):
+Pages → love-vibes-frontend → Custom domains → Add domain
+ Configure build settings in Cloudflare Pages:
+Build command: npx @cloudflare/next-on-pages
+Build output directory: .vercel/output/static
+Node.js version: 20.x
+3.2 Environment Variables (Pages)
+Where: Cloudflare Pages → Settings → Environment Variables
+
+Required Variables
+Variable	Value	Environment
+NEXT_PUBLIC_API_URL	https://love-vibes-backend.workers.dev	Production
+NEXT_PUBLIC_WS_URL	wss://love-vibes-backend.workers.dev	Production
+Actions
+ Set production environment variables:
+Go to Pages → love-vibes-frontend → Settings → Environment Variables
+Add NEXT_PUBLIC_API_URL for Production
+Add NEXT_PUBLIC_WS_URL for Production
+ Set preview environment variables (for staging):
+Add same variables with staging backend URLs
+ Verify variables are accessible in built app:
+console.log(process.env.NEXT_PUBLIC_API_URL);
+ Rebuild after adding variables - Trigger new deployment
+3.3 Authentication Flows
+Actions
+ Test Email OTP flow:
+ Enter email → receive OTP
+ Verify OTP → successful login
+ Error handling for invalid OTP
+ Test Passkey registration:
+ Register new passkey
+ Verify credential stored in browser
+ Logout and login with passkey
+ Test Passkey login:
+ Existing user can authenticate with passkey
+ Cross-device support (if applicable)
+ Test Google OAuth (if enabled):
+ Redirect to Google
+ Successful callback
+ Profile data populated
+ Test session persistence:
+ Token stored in localStorage
+ App maintains session on refresh
+ Token auto-refresh (if implemented)
+ Test logout:
+ Clears localStorage
+ Redirects to welcome screen
+3.4 API Integration Validation
+Actions
+ Test all critical API endpoints:
+Endpoint	Test	Status
+GET /v2/recs/core	Loads feed with profiles	[ ]
+POST /like	Like action works	[ ]
+POST /pass	Pass action works	[ ]
+GET /user/profile	Profile loads	[ ]
+PUT /user/profile	Profile updates	[ ]
+POST /v2/media/upload	Photo uploads	[ ]
+GET /v2/chat/icebreakers	AI suggestions load	[ ]
+WebSocket /ws/chat	Messages send/receive	[ ]
+POST /v2/billing/purchase-credits	Credits added	[ ]
+ Verify error handling:
+ Network errors show user-friendly messages
+ 401 errors redirect to login
+ API timeouts handled gracefully
+ Check loading states:
+ Skeleton loaders display during fetch
+ Buttons disable during submission
+ Verify offline behavior (if applicable)
+3.5 Mobile (Capacitor)
+Actions
+ Build web assets for Capacitor:
+npm run build
+npx cap sync android
+ Open Android Studio:
+npx cap open android
+ Configure Android app:
+ Update android/app/src/main/AndroidManifest.xml with permissions
+ Set app icons in android/app/src/main/res/
+ Configure package name: com.lovevibes.app
+ Test on Android device/emulator:
+ App installs successfully
+ Camera permission works
+ Location permission works
+ All screens render correctly
+ Generate signed APK for release:
+ Create keystore
+ Configure signing in android/app/build.gradle
+ Build release APK
+ Test deep links (if configured)
+Optional (Later)
+ iOS build:
+npx cap add ios
+npx cap open ios
+ Push notifications setup:
+ Configure Firebase Cloud Messaging (FCM) for Android
+ Configure Apple Push Notification Service (APNs) for iOS
+ Integrate with backend notification system
+3.6 UX & Performance
+Actions
+ Test on multiple devices:
+ iPhone (Safari)
+ Android (Chrome)
+ Various screen sizes (375px - 428px width)
+ Verify animations:
+ Splash screen animates smoothly
+ Swipe cards gesture works
+ Page transitions are smooth
+ No jank on low-end devices
+ Check accessibility:
+ All interactive elements have accessible names
+ Color contrast meets WCAG standards
+ Screen reader compatibility (basic)
+ Performance audit:
+# Run Lighthouse audit
+npx lighthouse https://love-vibes-frontend.pages.dev --view
+ Performance score > 80
+ First Contentful Paint < 2s
+ Time to Interactive < 4s
+ Image optimization:
+ All images use Next.js Image component
+ WebP format served where supported
+ Lazy loading enabled
+ Bundle size check:
+npm run build
+# Check .next/analyze/ (if configured)
+ Main bundle < 200KB gzipped
+ No unused dependencies
+ Test offline/slow network:
+ App degrades gracefully
+ Error messages are helpful
+ No infinite loading states
+4. FINAL DEPLOYMENT STEPS
+Pre-Deploy Verification
+ All secrets configured in Cloudflare Workers
+ D1 database created and migrated
+ R2 bucket created with CORS configured
+ Durable Objects bindings verified
+ Frontend environment variables set
+ TypeScript compiles with 0 errors (backend + frontend)
+Deploy Backend
+cd backend
+npm run deploy
+# or
+wrangler deploy
+Deploy Frontend
+cd frontend
+npm run pages:deploy
+Post-Deploy Verification
+ Backend health check: curl https://love-vibes-backend.workers.dev/health
+ Frontend loads: Visit https://love-vibes-frontend.pages.dev
+ Auth flow works end-to-end
+ Swipe actions work
+ Chat messages send/receive
+ Profile updates persist
+Quick Reference: Cloudflare Dashboard Locations
+Item	Dashboard Location
+Workers secrets	Workers & Pages → love-vibes-backend → Settings → Variables
+D1 Database	Workers & Pages → D1 → love-vibes-db
+R2 Bucket	R2 → love-vibes-media
+Pages env vars	Workers & Pages → love-vibes-frontend → Settings → Environment variables
+Durable Objects	Workers & Pages → love-vibes-backend → Durable Objects
+Logs	Workers & Pages → love-vibes-backend → Logs
+Analytics	Analytics → Workers Analytics
+WAF	Websites → Security → WAF
+Deployment Commands Cheat Sheet
+# Backend
+cd backend
+wrangler deploy                           # Deploy to production
+wrangler dev                              # Local development
+wrangler d1 execute love-vibes-db --local # Run SQL locally
+wrangler secret put SECRET_NAME           # Add secret
+# Frontend
+cd frontend
+npm run dev                               # Local development
+npm run build                             # Build for production
+npm run pages:deploy                      # Deploy to Cloudflare Pages
+# Mobile (Capacitor)
+npx cap sync android                      # Sync web assets
+npx cap open android                      # Open in Android Studio
+npx cap run android                       # Run on device/emulator
+✅ Checklist Complete - Ready for Production!
