@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState } from "react"
-import { useApp, type AppScreen, mockUsers } from "@/lib/app-context"
+import { useApp, type AppScreen } from "@/lib/app-context"
 import { motion, AnimatePresence } from "framer-motion"
 import {
   Settings,
@@ -267,28 +267,7 @@ export function DevToolbar() {
                       </div>
                     </motion.button>
 
-                    <motion.button
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                      onClick={() => {
-                        const targetUser = mockUsers[Math.floor(Math.random() * mockUsers.length)];
-                        localStorage.setItem('simulated_match', JSON.stringify(targetUser));
-                        localStorage.setItem('skip_splash', 'true');
-                        window.location.reload();
-                      }}
-                      className="w-full p-6 bg-gradient-to-r from-[#7A1F3D]/10 to-transparent border border-[#7A1F3D]/30 rounded-[28px] flex items-center gap-5 group relative overflow-hidden"
-                    >
-                      <div className="w-14 h-14 rounded-2xl bg-[#7A1F3D] flex items-center justify-center shadow-[0_0_30px_rgba(122,31,61,0.4)] group-hover:scale-110 transition-transform">
-                        <Heart className="h-7 w-7 text-white" fill="currentColor" />
-                      </div>
-                      <div className="text-left">
-                        <p className="text-sm font-black text-white tracking-tight">Force Match</p>
-                        <p className="text-[10px] text-[#7A1F3D] font-black uppercase tracking-widest mt-1 opacity-80">Trigger High-Vibe Experience</p>
-                      </div>
-                      <div className="absolute right-6 opacity-20 group-hover:opacity-100 transition-opacity">
-                        <ChevronRight className="h-6 w-6 text-[#7A1F3D]" />
-                      </div>
-                    </motion.button>
+
                   </div>
                 </section>
 
