@@ -4,19 +4,27 @@ To enable automatic deployments via GitHub Actions, you must configure the follo
 
 ## Steps to Configure
 
-1.  Navigate to your repository on GitHub.
-2.  Go to **Settings** > **Secrets and variables** > **Actions**.
-3.  Click **New repository secret** for each of the following:
+1. Navigate to your repository on GitHub.
+2. Go to **Settings** > **Secrets and variables** > **Actions**.
+3. Click **New repository secret** for each of the following:
 
 ### 1. `CLOUDFLARE_API_TOKEN`
+
 - **Value**: Your Cloudflare API Token (with "Edit Cloudflare Workers" permissions).
 - **Criticality**: 🔴 Required for Backend CI.
 
 ### 2. `CLOUDFLARE_ACCOUNT_ID`
+
 - **Value**: Your Cloudflare Account ID (found in the Workers & Pages dashboard sidebar).
 - **Criticality**: 🔴 Required for Backend CI.
 
-### 3. `NEXT_PUBLIC_API_URL` (Optional as Secret)
+### 3. `RESEND_API_KEY`
+
+- **Value**: `re_AGoQGcvp_7DHyVAkguQYWsv2U5uA1kkaJ` (or your own Resend key).
+- **Criticality**: 🟡 High (Required for Email OTP).
+
+### 4. `NEXT_PUBLIC_API_URL` (Optional as Secret)
+
 - **Value**: `https://lovevibes.thelovevibes-ai.workers.dev`
 - **Note**: You can also set this as a **Variable** instead of a Secret.
 
