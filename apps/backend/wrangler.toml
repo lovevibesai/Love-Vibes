@@ -2,6 +2,8 @@ name = "lovevibes"
 main = "src/index.ts"
 compatibility_date = "2025-01-18"
 compatibility_flags = [ "nodejs_compat" ]
+[vars]
+RP_ID = "love-vibes-app.pages.dev"
 
 # Analytics Engine (LV AI Tracking)
 [[analytics_engine_datasets]]

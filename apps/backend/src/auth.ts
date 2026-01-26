@@ -88,8 +88,9 @@ export async function handleAuth(request: Request, env: Env): Promise<Response> 
             response,
             expectedChallenge: challengeRow.challenge as string,
             expectedOrigin: [
+                'https://love-vibes-app.pages.dev',
                 'https://love-vibes-frontend.pages.dev',
-                'https://2428c90c.love-vibes-frontend.pages.dev',
+                'https://553b3734.love-vibes-app.pages.dev',
                 `https://${getRpId(env)}`,
                 'http://localhost:3000'
             ],
@@ -208,8 +209,9 @@ export async function handleAuth(request: Request, env: Env): Promise<Response> 
             response,
             expectedChallenge: challengeRow.challenge as string,
             expectedOrigin: [
+                'https://love-vibes-app.pages.dev',
                 'https://love-vibes-frontend.pages.dev',
-                'https://2428c90c.love-vibes-frontend.pages.dev',
+                'https://553b3734.love-vibes-app.pages.dev',
                 `https://${getRpId(env)}`,
                 'http://localhost:3000',
                 'http://localhost:3001',
