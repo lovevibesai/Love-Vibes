@@ -2,6 +2,19 @@
 // Time-boxed matching creates scarcity and focused attention
 
 import { Env } from './index'
+import { z } from 'zod';
+import { AuthenticationError, ValidationError, AppError } from './errors';
+import { logger } from './logger';
+
+// Zod Schemas
+const VibeWindowSchema = z.object({
+    day_of_week: z.number().int().min(0).max(6),
+    start_hour: z.number().int().min(0).max(23),
+});
+
+const SetVibeWindowsSchema = z.object({
+    windows: z.array(VibeWindowSchema).max(2),
+});
 
 export interface VibeWindow {
     day_of_week: number
@@ -23,11 +36,9 @@ const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 
 export async function setVibeWindows(
     env: Env,
     userId: string,
-    windows: Array<{ day_of_week: number; start_hour: number }>
+    windowsRaw: any
 ): Promise<{ success: boolean; message: string }> {
-    if (windows.length > 2) {
-        return { success: false, message: 'Maximum 2 vibe windows allowed' }
-    }
+    const { windows } = SetVibeWindowsSchema.parse(windowsRaw);
 
     try {
         const now = Math.floor(Date.now() / 1000)
@@ -46,10 +57,11 @@ export async function setVibeWindows(
                 .run()
         }
 
+        logger.info('vibe_windows_updated', undefined, { userId, count: windows.length });
         return { success: true, message: 'Vibe windows updated!' }
-    } catch (error) {
-        console.error('Failed to set vibe windows:', error)
-        return { success: false, message: 'Failed to update windows' }
+    } catch (error: any) {
+        if (error instanceof z.ZodError) throw new ValidationError(error.errors[0].message);
+        throw new AppError('Failed to set vibe windows', 500, 'VIBE_UPDATE_FAILED', error);
     }
 }
 
@@ -177,22 +189,26 @@ export async function logVibeWindowActivity(
 export async function handleVibeWindows(request: Request, env: Env): Promise<Response> {
     const { verifyAuth } = await import('./auth');
     const userId = await verifyAuth(request, env);
-    if (!userId) return new Response("Unauthorized", { status: 401 });
+    if (!userId) throw new AuthenticationError();
 
     const url = new URL(request.url);
     const path = url.pathname;
     const method = request.method;
+    const jsonHeaders = { 'Content-Type': 'application/json' };
 
     if (path === '/v2/vibe-windows/set' && method === 'POST') {
-        const body = await request.json() as any;
-        const result = await setVibeWindows(env, userId, body.windows);
-        return new Response(JSON.stringify(result), { headers: { 'Content-Type': 'application/json' } });
+        const body = await request.json();
+        const result = await setVibeWindows(env, userId, body);
+        return new Response(JSON.stringify(result), { headers: jsonHeaders });
     }
 
     if (path === '/v2/vibe-windows/status' && method === 'GET') {
         const result = await getVibeWindowStatus(env, userId);
-        return new Response(JSON.stringify(result), { headers: { 'Content-Type': 'application/json' } });
+        return new Response(JSON.stringify({ success: true, data: result }), { headers: jsonHeaders });
     }
 
-    return new Response("Not Found", { status: 404 });
+    return new Response(JSON.stringify({ error: 'Route not found' }), {
+        status: 404,
+        headers: jsonHeaders
+    });
 }

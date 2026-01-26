@@ -3,6 +3,19 @@
 
 import { Env } from './index'
 import * as jose from 'jose'
+import { z } from 'zod';
+import { ValidationError, AppError, NotFoundError } from './errors';
+import { logger } from './logger';
+
+// Zod Schemas
+const RequestResetSchema = z.object({
+    email: z.string().email(),
+});
+
+const ResetPasswordSchema = z.object({
+    token: z.string().uuid(),
+    new_password: z.string().min(8).max(100),
+});
 
 export async function requestPasswordReset(env: Env, email: string): Promise<{ success: boolean; message: string }> {
     try {
@@ -32,9 +45,8 @@ export async function requestPasswordReset(env: Env, email: string): Promise<{ s
         // await sendEmail(email, 'Password Reset', resetLink)
 
         return { success: true, message: 'If an account exists, a reset link has been sent' }
-    } catch (error) {
-        console.error('Password reset request failed:', error)
-        return { success: false, message: 'Failed to process request' }
+    } catch (error: any) {
+        throw new AppError('Password reset request failed', 500, 'RESET_REQUEST_FAILED', error);
     }
 }
 
@@ -54,7 +66,7 @@ export async function resetPassword(
             .first()
 
         if (!resetRecord) {
-            return { success: false, message: 'Invalid or expired reset token' }
+            throw new AppError('Invalid or expired reset token', 400, 'INVALID_TOKEN');
         }
 
         // Hash new password (use bcrypt in production)
@@ -70,10 +82,11 @@ export async function resetPassword(
             .bind(token)
             .run()
 
+        logger.info('password_reset_success', undefined, { userId: resetRecord.user_id });
         return { success: true, message: 'Password reset successfully' }
-    } catch (error) {
-        console.error('Password reset failed:', error)
-        return { success: false, message: 'Failed to reset password' }
+    } catch (error: any) {
+        if (error instanceof AppError) throw error;
+        throw new AppError('Failed to reset password', 500, 'RESET_FAILED', error);
     }
 }
 
@@ -92,53 +105,21 @@ export async function handleRecovery(request: Request, env: Env): Promise<Respon
     const url = new URL(request.url);
     const path = url.pathname;
     const method = request.method;
+    const jsonHeaders = { 'Content-Type': 'application/json' };
 
     // POST /v2/recovery/request - Request password reset
     if (path.endsWith('/request') && method === 'POST') {
-        try {
-            const body = await request.json() as any;
-            if (!body.email) {
-                return new Response(JSON.stringify({ error: 'Missing email' }), {
-                    status: 400,
-                    headers: { 'Content-Type': 'application/json' }
-                });
-            }
-
-            const result = await requestPasswordReset(env, body.email);
-            return new Response(JSON.stringify(result), {
-                headers: { 'Content-Type': 'application/json' }
-            });
-        } catch (error) {
-            return new Response(JSON.stringify({ error: 'Invalid request' }), {
-                status: 400,
-                headers: { 'Content-Type': 'application/json' }
-            });
-        }
+        const body = RequestResetSchema.parse(await request.json());
+        const result = await requestPasswordReset(env, body.email);
+        return new Response(JSON.stringify(result), { headers: jsonHeaders });
     }
 
     // POST /v2/recovery/reset - Reset password with token
     if (path.endsWith('/reset') && method === 'POST') {
-        try {
-            const body = await request.json() as any;
-            if (!body.token || !body.new_password) {
-                return new Response(JSON.stringify({ error: 'Missing token or new_password' }), {
-                    status: 400,
-                    headers: { 'Content-Type': 'application/json' }
-                });
-            }
-
-            const result = await resetPassword(env, body.token, body.new_password);
-            return new Response(JSON.stringify(result), {
-                status: result.success ? 200 : 400,
-                headers: { 'Content-Type': 'application/json' }
-            });
-        } catch (error) {
-            return new Response(JSON.stringify({ error: 'Invalid request' }), {
-                status: 400,
-                headers: { 'Content-Type': 'application/json' }
-            });
-        }
+        const body = ResetPasswordSchema.parse(await request.json());
+        const result = await resetPassword(env, body.token, body.new_password);
+        return new Response(JSON.stringify(result), { headers: jsonHeaders });
     }
 
-    return new Response('Method not allowed', { status: 405 });
+    throw new AppError('Method not allowed', 405, 'METHOD_NOT_ALLOWED');
 }

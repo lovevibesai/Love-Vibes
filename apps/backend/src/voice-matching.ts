@@ -2,6 +2,15 @@
 // Match based on voice before seeing photos
 
 import { Env } from './index'
+import { z } from 'zod';
+import { AuthenticationError, ValidationError, AppError } from './errors';
+import { logger } from './logger';
+
+// Zod Schemas
+const VoiceSwipeSchema = z.object({
+    target_id: z.string().uuid(),
+    action: z.enum(['LIKE', 'PASS']),
+});
 
 export interface VoiceProfile {
     user_id: string
@@ -60,9 +69,8 @@ export async function uploadVoiceProfile(
             .run()
 
         return { success: true, message: 'Voice profile created!', voice_url: voiceUrl }
-    } catch (error) {
-        console.error('Voice upload failed:', error)
-        return { success: false, message: 'Failed to upload voice' }
+    } catch (error: any) {
+        throw new AppError('Failed to upload voice profile', 500, 'VOICE_UPLOAD_FAILED', error);
     }
 }
 
@@ -139,13 +147,13 @@ export async function voiceSwipe(
                 .bind(matchId, actorId, targetId, now)
                 .run()
 
+            logger.info('voice_match_created', undefined, { actorId, targetId, matchId });
             return { success: true, mutual_match: true, photos_unlocked: true }
         }
 
         return { success: true, mutual_match: false, photos_unlocked: false }
-    } catch (error) {
-        console.error('Voice swipe failed:', error)
-        return { success: false, mutual_match: false, photos_unlocked: false }
+    } catch (error: any) {
+        throw new AppError('Failed to process voice swipe', 500, 'VOICE_SWIPE_FAILED', error);
     }
 }
 
@@ -172,30 +180,34 @@ async function analyzeVoice(audioFile: File): Promise<{
 export async function handleVoiceMatching(request: Request, env: Env): Promise<Response> {
     const { verifyAuth } = await import('./auth');
     const userId = await verifyAuth(request, env);
-    if (!userId) return new Response("Unauthorized", { status: 401 });
+    if (!userId) throw new AuthenticationError();
 
     const url = new URL(request.url);
     const path = url.pathname;
     const method = request.method;
+    const jsonHeaders = { 'Content-Type': 'application/json' };
 
     if (path === '/v2/voice/upload' && method === 'POST') {
         const formData = await request.formData();
         const file = formData.get('file') as unknown as File;
-        if (!file) return new Response("Missing file", { status: 400 });
+        if (!file) throw new ValidationError('Missing audio file');
         const result = await uploadVoiceProfile(env, userId, file);
-        return new Response(JSON.stringify(result), { headers: { 'Content-Type': 'application/json' } });
+        return new Response(JSON.stringify(result), { headers: jsonHeaders });
     }
 
     if (path === '/v2/voice/feed' && method === 'GET') {
         const result = await getVoiceFeed(env, userId);
-        return new Response(JSON.stringify(result), { headers: { 'Content-Type': 'application/json' } });
+        return new Response(JSON.stringify({ success: true, data: result }), { headers: jsonHeaders });
     }
 
     if (path === '/v2/voice/swipe' && method === 'POST') {
-        const body = await request.json() as any;
+        const body = VoiceSwipeSchema.parse(await request.json());
         const result = await voiceSwipe(env, userId, body.target_id, body.action);
-        return new Response(JSON.stringify(result), { headers: { 'Content-Type': 'application/json' } });
+        return new Response(JSON.stringify(result), { headers: jsonHeaders });
     }
 
-    return new Response("Not Found", { status: 404 });
+    return new Response(JSON.stringify({ error: 'Route not found' }), {
+        status: 404,
+        headers: jsonHeaders
+    });
 }

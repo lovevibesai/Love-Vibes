@@ -2,6 +2,28 @@
 // Leverage real social graphs for trusted introductions
 
 import { Env } from './index'
+import { z } from 'zod';
+import { AuthenticationError, ValidationError, NotFoundError, AppError } from './errors';
+import { logger } from './logger';
+
+// Zod Schemas
+const ImportContactsSchema = z.object({
+    contacts: z.array(z.object({
+        phone: z.string().min(5),
+        name: z.string().min(1),
+    })),
+});
+
+const RequestIntroSchema = z.object({
+    target_id: z.string().uuid(),
+    mutual_friend_id: z.string().uuid(),
+});
+
+const RespondIntroSchema = z.object({
+    request_id: z.string().uuid(),
+    response: z.enum(['approved', 'declined']),
+    message: z.string().optional(),
+});
 
 export interface MutualFriendInfo {
     friend_id: string
@@ -13,8 +35,9 @@ export interface MutualFriendInfo {
 export async function importContacts(
     env: Env,
     userId: string,
-    contacts: Array<{ phone: string; name: string }>
+    contactsRaw: z.infer<typeof ImportContactsSchema>
 ): Promise<{ success: boolean; imported_count: number }> {
+    const { contacts } = contactsRaw;
     const now = Math.floor(Date.now() / 1000)
     let imported = 0
 
@@ -33,10 +56,10 @@ export async function importContacts(
             imported++
         }
 
+        logger.info('contacts_imported', undefined, { userId, count: imported });
         return { success: true, imported_count: imported }
-    } catch (error) {
-        console.error('Contact import failed:', error)
-        return { success: false, imported_count: 0 }
+    } catch (error: any) {
+        throw new AppError('Failed to import contacts', 500, 'CONTACT_IMPORT_FAILED', error);
     }
 }
 
@@ -91,7 +114,7 @@ export async function requestIntroduction(
             .first()
 
         if (!requester || !target) {
-            return { success: false, message: 'User not found' }
+            throw new NotFoundError('User');
         }
 
         // Create introduction request
@@ -103,12 +126,11 @@ export async function requestIntroduction(
             .run()
 
         // Send notification to mutual friend
-        // await sendPushNotification(mutualFriendId, ...)
-
+        logger.info('intro_requested', undefined, { requesterId, targetId, mutualFriendId });
         return { success: true, message: 'Introduction request sent!' }
-    } catch (error) {
-        console.error('Introduction request failed:', error)
-        return { success: false, message: 'Failed to send request' }
+    } catch (error: any) {
+        if (error instanceof AppError) throw error;
+        throw new AppError('Failed to send intro request', 500, 'INTRO_REQUEST_FAILED', error);
     }
 }
 
@@ -131,7 +153,7 @@ export async function respondToIntroduction(
             .first()
 
         if (!request) {
-            return { success: false }
+            throw new NotFoundError('Introduction request');
         }
 
         // Update request status
@@ -150,17 +172,15 @@ export async function respondToIntroduction(
                 .bind(matchId, request.requester_id, request.target_id, now)
                 .run()
 
-            // Send notifications to both users
-            // await sendPushNotification(request.requester_id, ...)
-            // await sendPushNotification(request.target_id, ...)
-
+            logger.info('intro_approved', undefined, { friendId, requestId, matchId });
             return { success: true, match_created: true }
         }
 
+        logger.info('intro_declined', undefined, { friendId, requestId });
         return { success: true, match_created: false }
-    } catch (error) {
-        console.error('Introduction response failed:', error)
-        return { success: false }
+    } catch (error: any) {
+        if (error instanceof AppError) throw error;
+        throw new AppError('Failed to respond to intro', 500, 'INTRO_RESPONSE_FAILED', error);
     }
 }
 
@@ -181,36 +201,40 @@ async function hashPhoneNumber(phone: string): Promise<string> {
 export async function handleMutualFriends(request: Request, env: Env): Promise<Response> {
     const { verifyAuth } = await import('./auth');
     const userId = await verifyAuth(request, env);
-    if (!userId) return new Response("Unauthorized", { status: 401 });
+    if (!userId) throw new AuthenticationError();
 
     const url = new URL(request.url);
     const path = url.pathname;
     const method = request.method;
+    const jsonHeaders = { 'Content-Type': 'application/json' };
 
     if (path === '/v2/social/import' && method === 'POST') {
-        const body = await request.json() as any;
-        const result = await importContacts(env, userId, body.contacts);
-        return new Response(JSON.stringify(result), { headers: { 'Content-Type': 'application/json' } });
+        const body = ImportContactsSchema.parse(await request.json());
+        const result = await importContacts(env, userId, body);
+        return new Response(JSON.stringify(result), { headers: jsonHeaders });
     }
 
     if (path.startsWith('/v2/social/mutual/') && method === 'GET') {
         const targetId = path.split('/').pop();
-        if (!targetId) return new Response("Missing target ID", { status: 400 });
+        if (!targetId) throw new ValidationError("Missing target ID");
         const result = await findMutualFriends(env, userId, targetId);
-        return new Response(JSON.stringify(result), { headers: { 'Content-Type': 'application/json' } });
+        return new Response(JSON.stringify({ success: true, data: result }), { headers: jsonHeaders });
     }
 
     if (path === '/v2/social/request-intro' && method === 'POST') {
-        const body = await request.json() as any;
+        const body = RequestIntroSchema.parse(await request.json());
         const result = await requestIntroduction(env, userId, body.target_id, body.mutual_friend_id);
-        return new Response(JSON.stringify(result), { headers: { 'Content-Type': 'application/json' } });
+        return new Response(JSON.stringify(result), { headers: jsonHeaders });
     }
 
     if (path === '/v2/social/respond-intro' && method === 'POST') {
-        const body = await request.json() as any;
+        const body = RespondIntroSchema.parse(await request.json());
         const result = await respondToIntroduction(env, body.request_id, userId, body.response, body.message);
-        return new Response(JSON.stringify(result), { headers: { 'Content-Type': 'application/json' } });
+        return new Response(JSON.stringify(result), { headers: jsonHeaders });
     }
 
-    return new Response("Not Found", { status: 404 });
+    return new Response(JSON.stringify({ error: 'Route not found' }), {
+        status: 404,
+        headers: jsonHeaders
+    });
 }

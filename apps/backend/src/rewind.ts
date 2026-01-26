@@ -2,6 +2,15 @@
 // Allow users to undo their last swipe
 
 import { Env } from './index'
+import { z } from 'zod';
+import { AuthenticationError, ValidationError, AppError } from './errors';
+import { logger } from './logger';
+import { verifyAuth } from './auth';
+
+// Zod Schema
+const RewindSchema = z.object({
+    is_premium: z.boolean().default(false),
+});
 
 interface SwipeHistory {
     actor_id: string
@@ -40,13 +49,12 @@ export async function undoLastSwipe(
     const history = swipeHistory.get(userId)
 
     if (!history || history.length === 0) {
-        return { success: false, message: 'No swipes to undo' }
+        throw new AppError('No swipes to undo', 400, 'NO_SWIPES_TO_UNDO');
     }
 
     // Check rewind limit for free users
     if (!isPremium) {
         const today = new Date().toDateString()
-        const rewindKey = `rewind:${userId}:${today}`
 
         const rewindCount = await env.DB.prepare(
             'SELECT COUNT(*) as count FROM RewindHistory WHERE user_id = ? AND date = ?'
@@ -55,7 +63,7 @@ export async function undoLastSwipe(
             .first()
 
         if ((rewindCount?.count as number) >= 1) {
-            return { success: false, message: 'Free users get 1 rewind per day. Upgrade for unlimited!' }
+            throw new AppError('Free users get 1 rewind per day. Upgrade for unlimited!', 402, 'REWIND_LIMIT_REACHED');
         }
     }
 
@@ -91,42 +99,27 @@ export async function undoLastSwipe(
             .bind(lastSwipe.target_id)
             .first()
 
+        logger.info('swipe_undone', undefined, { userId, targetId: lastSwipe.target_id });
         return { success: true, message: 'Swipe undone', profile }
-    } catch (error) {
-        console.error('Undo swipe failed:', error)
-        return { success: false, message: 'Failed to undo swipe' }
+    } catch (error: any) {
+        if (error instanceof AppError) throw error;
+        throw new AppError('Failed to undo swipe', 500, 'UNDO_FAILED', error);
     }
 }
 
 // HTTP Handler for rewind routes
 export async function handleRewind(request: Request, env: Env): Promise<Response> {
+    const userId = await verifyAuth(request, env);
+    if (!userId) throw new AuthenticationError();
+
     const method = request.method;
+    const jsonHeaders = { 'Content-Type': 'application/json' };
 
     if (method === 'POST') {
-        try {
-            const body = await request.json() as any;
-            const userId = body.user_id;
-            const isPremium = body.is_premium || false;
-
-            if (!userId) {
-                return new Response(JSON.stringify({ error: 'Missing user_id' }), {
-                    status: 400,
-                    headers: { 'Content-Type': 'application/json' }
-                });
-            }
-
-            const result = await undoLastSwipe(env, userId, isPremium);
-            return new Response(JSON.stringify(result), {
-                status: result.success ? 200 : 400,
-                headers: { 'Content-Type': 'application/json' }
-            });
-        } catch (error) {
-            return new Response(JSON.stringify({ error: 'Invalid request' }), {
-                status: 400,
-                headers: { 'Content-Type': 'application/json' }
-            });
-        }
+        const body = RewindSchema.parse(await request.json());
+        const result = await undoLastSwipe(env, userId, body.is_premium);
+        return new Response(JSON.stringify(result), { headers: jsonHeaders });
     }
 
-    return new Response('Method not allowed', { status: 405 });
+    throw new AppError('Method not allowed', 405, 'METHOD_NOT_ALLOWED');
 }

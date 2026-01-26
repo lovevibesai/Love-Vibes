@@ -2,6 +2,17 @@
 // Public success stories and testimonials
 
 import { Env } from './index'
+import { z } from 'zod';
+import { AuthenticationError, ValidationError, NotFoundError, AppError } from './errors';
+import { logger } from './logger';
+import { verifyAuth } from './auth';
+
+// Zod Schema
+const SubmitStorySchema = z.object({
+    partner_id: z.string().uuid(),
+    story_text: z.string().min(50).max(2000),
+    relationship_length: z.string().min(1).max(50),
+});
 
 export interface SuccessStory {
     id: string
@@ -21,13 +32,10 @@ export interface SuccessStory {
 export async function submitSuccessStory(
     env: Env,
     userId: string,
-    story: {
-        partner_id: string
-        story_text: string
-        relationship_length: string
-    }
+    storyRaw: any
 ): Promise<{ success: boolean; message: string }> {
     try {
+        const story = SubmitStorySchema.parse(storyRaw);
         const now = Math.floor(Date.now() / 1000)
         const storyId = crypto.randomUUID()
 
@@ -40,8 +48,11 @@ export async function submitSuccessStory(
             .bind(story.partner_id)
             .first()
 
-        if (!user || !partner) {
-            return { success: false, message: 'User not found' }
+        if (!user) {
+            throw new NotFoundError('User not found for the submitting user.');
+        }
+        if (!partner) {
+            throw new NotFoundError('Partner not found.');
         }
 
         // Insert story (pending approval)
@@ -66,10 +77,12 @@ export async function submitSuccessStory(
             )
             .run()
 
+        logger.info('story_submitted', undefined, { userId, partnerId: story.partner_id, storyId });
         return { success: true, message: 'Story submitted for review!' }
-    } catch (error) {
-        console.error('Story submission failed:', error)
-        return { success: false, message: 'Failed to submit story' }
+    } catch (error: any) {
+        if (error instanceof z.ZodError) throw new ValidationError(error.errors[0].message);
+        if (error instanceof AppError) throw error;
+        throw new AppError('Failed to submit story', 500, 'STORY_SUBMISSION_FAILED', error);
     }
 }
 
@@ -89,48 +102,29 @@ export async function getSuccessStories(env: Env, limit: number = 20): Promise<S
 
 // HTTP Handler for success stories routes
 export async function handleSuccessStories(request: Request, env: Env): Promise<Response> {
+    const userId = await verifyAuth(request, env).catch(() => null); // Public GET, Auth POST
+
     const url = new URL(request.url);
     const method = request.method;
+    const jsonHeaders = { 'Content-Type': 'application/json' };
 
     // GET /v2/success-stories - Get approved stories
     if (method === 'GET') {
         const limit = parseInt(url.searchParams.get('limit') || '20');
         const stories = await getSuccessStories(env, limit);
-        return new Response(JSON.stringify({ status: 'success', stories }), {
-            headers: { 'Content-Type': 'application/json' }
+        return new Response(JSON.stringify({ success: true, data: stories }), {
+            headers: jsonHeaders
         });
     }
 
     // POST /v2/success-stories - Submit a story
     if (method === 'POST') {
-        try {
-            const body = await request.json() as any;
-            const userId = body.user_id;
+        if (!userId) throw new AuthenticationError();
+        const body = await request.json();
+        const result = await submitSuccessStory(env, userId, body);
 
-            if (!userId || !body.partner_id || !body.story_text) {
-                return new Response(JSON.stringify({ error: 'Missing required fields' }), {
-                    status: 400,
-                    headers: { 'Content-Type': 'application/json' }
-                });
-            }
-
-            const result = await submitSuccessStory(env, userId, {
-                partner_id: body.partner_id,
-                story_text: body.story_text,
-                relationship_length: body.relationship_length || ''
-            });
-
-            return new Response(JSON.stringify(result), {
-                status: result.success ? 200 : 400,
-                headers: { 'Content-Type': 'application/json' }
-            });
-        } catch (error) {
-            return new Response(JSON.stringify({ error: 'Invalid request' }), {
-                status: 400,
-                headers: { 'Content-Type': 'application/json' }
-            });
-        }
+        return new Response(JSON.stringify(result), { headers: jsonHeaders });
     }
 
-    return new Response('Method not allowed', { status: 405 });
+    throw new AppError('Method not allowed', 405, 'METHOD_NOT_ALLOWED');
 }

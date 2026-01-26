@@ -4,18 +4,21 @@
  */
 import { Env } from './index';
 import { verifyAuth } from './auth';
+import { AuthenticationError, ValidationError, NotFoundError, AppError } from './errors';
+import { logger } from './logger';
 
 export async function handleChatAI(request: Request, env: Env): Promise<Response> {
     const userId = await verifyAuth(request, env);
-    if (!userId) return new Response("Unauthorized", { status: 401 });
+    if (!userId) throw new AuthenticationError();
 
     const url = new URL(request.url);
     const path = url.pathname;
+    const jsonHeaders = { 'Content-Type': 'application/json' };
 
     // 1. Generate Icebreakers (GET /v2/chat/icebreakers?with_user_id=...)
     if (path === '/v2/chat/icebreakers' && request.method === 'GET') {
         const withUserId = url.searchParams.get('with_user_id');
-        if (!withUserId) return new Response("Missing with_user_id", { status: 400 });
+        if (!withUserId) throw new ValidationError("Missing with_user_id");
 
         // Fetch Both Users
         const { results } = await env.DB.prepare(
@@ -25,7 +28,7 @@ export async function handleChatAI(request: Request, env: Env): Promise<Response
         const u1 = (results as any).find((r: any) => r.id === userId);
         const u2 = (results as any).find((r: any) => r.id === withUserId);
 
-        if (!u1 || !u2) return new Response("Users not found", { status: 404 });
+        if (!u1 || !u2) throw new NotFoundError("Users");
 
         // Analyze overlap
         const int1 = JSON.parse(u1.interests || '[]');
@@ -83,25 +86,27 @@ export async function handleChatAI(request: Request, env: Env): Promise<Response
                 icebreakers = [text.split('\n')[0]]; // Fallback to first line
             }
 
+            logger.info('icebreakers_generated', undefined, { userId, withUserId });
+
             return new Response(JSON.stringify({
-                status: "success",
+                success: true,
                 icebreakers: icebreakers.slice(0, 3),
                 meta: { model: "llama-3.1-8b-instruct" }
-            }), { headers: { 'Content-Type': 'application/json' } });
+            }), { headers: jsonHeaders });
 
-        } catch (e) {
-            console.error("AI Icebreaker failed", e);
+        } catch (e: any) {
+            logger.error("AI Icebreaker failed", e, { userId, withUserId });
             // Fallback to basic logic if AI fails
             return new Response(JSON.stringify({
-                status: "success",
+                success: true,
                 icebreakers: [
                     `Hey! I notice we both love ${sharedInterests[0] || 'exploring'}.`,
                     "What's the most underrated spot in our city?",
                     "Tell me one thing that's NOT on your profile!"
                 ]
-            }), { headers: { 'Content-Type': 'application/json' } });
+            }), { headers: jsonHeaders });
         }
     }
 
-    return new Response("Not Found", { status: 404 });
+    throw new NotFoundError("Chat route");
 }

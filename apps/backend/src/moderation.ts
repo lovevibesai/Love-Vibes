@@ -2,6 +2,16 @@
 // Admin panel for reviewing flagged content and user reports
 
 import { Env } from './index'
+import { z } from 'zod';
+import { AuthenticationError, ValidationError, NotFoundError, AppError } from './errors';
+import { logger } from './logger';
+
+// Zod Schema
+const ReviewReportSchema = z.object({
+    report_id: z.string().uuid(),
+    action: z.enum(['DISMISS', 'BAN_USER', 'WARN_USER']),
+    notes: z.string().max(1000).default(''),
+});
 
 export interface ModerationReport {
     id: string
@@ -26,9 +36,7 @@ export async function autoModerateContent(env: Env, text: string): Promise<{ tox
             text: text
         });
 
-        // mnli returns label scores. "toxic" is often mapped or we check for general negative sentiment
-        // For simplicity with this model, we'll look for the highest probability label
-        const toxicScore = result.label === 'LABEL_1' ? result.score : 0; // Depends on model mapping
+        const toxicScore = result.label === 'LABEL_1' ? result.score : 0;
 
         return {
             toxic: toxicScore > 0.85,
@@ -41,13 +49,12 @@ export async function autoModerateContent(env: Env, text: string): Promise<{ tox
 
 // GET /admin/moderation/reports - Get all pending reports
 export async function getPendingReports(env: Env, adminId: string): Promise<ModerationReport[]> {
-    // Verify admin status
     const admin = await env.DB.prepare('SELECT id FROM Users WHERE id = ? AND subscription_tier = ?')
         .bind(adminId, 'admin')
         .first()
 
     if (!admin) {
-        throw new Error('Unauthorized')
+        throw new AuthenticationError('Admin access required');
     }
 
     const results = await env.DB.prepare(
@@ -81,41 +88,36 @@ export async function reviewReport(
     action: 'DISMISS' | 'BAN_USER' | 'WARN_USER',
     notes: string
 ): Promise<{ success: boolean; message: string }> {
-    // Verify admin status
     const admin = await env.DB.prepare('SELECT id FROM Users WHERE id = ? AND subscription_tier = ?')
         .bind(adminId, 'admin')
         .first()
 
     if (!admin) {
-        return { success: false, message: 'Unauthorized' }
+        throw new AuthenticationError('Admin access required');
     }
 
     try {
         const now = Math.floor(Date.now() / 1000)
 
-        // Get report details
         const report = await env.DB.prepare('SELECT reported_id FROM Reports WHERE id = ?')
             .bind(reportId)
             .first()
 
         if (!report) {
-            return { success: false, message: 'Report not found' }
+            throw new NotFoundError('Report');
         }
 
-        // Update report status
         await env.DB.prepare(
             'UPDATE Reports SET status = ?, admin_notes = ?, reviewed_by = ?, reviewed_at = ? WHERE id = ?'
         )
             .bind('REVIEWED', notes, adminId, now, reportId)
             .run()
 
-        // Take action on reported user
         if (action === 'BAN_USER') {
             await env.DB.prepare('UPDATE Users SET subscription_tier = ? WHERE id = ?')
                 .bind('banned', report.reported_id)
                 .run()
         } else if (action === 'WARN_USER') {
-            // Log warning (could send notification)
             await env.DB.prepare(
                 'INSERT INTO ModerationActions (user_id, action, reason, admin_id, timestamp) VALUES (?, ?, ?, ?, ?)'
             )
@@ -123,10 +125,11 @@ export async function reviewReport(
                 .run()
         }
 
+        logger.info('report_reviewed', undefined, { adminId, reportId, action });
         return { success: true, message: 'Report reviewed successfully' }
-    } catch (error) {
-        console.error('Report review failed:', error)
-        return { success: false, message: 'Failed to review report' }
+    } catch (error: any) {
+        if (error instanceof AppError) throw error;
+        throw new AppError('Report review failed', 500, 'REVIEW_FAILED', error);
     }
 }
 
@@ -137,7 +140,7 @@ export async function getModerationStats(env: Env, adminId: string): Promise<any
         .first()
 
     if (!admin) {
-        throw new Error('Unauthorized')
+        throw new AuthenticationError('Admin access required');
     }
 
     const stats = await env.DB.prepare(
@@ -157,70 +160,31 @@ export async function handleModeration(request: Request, env: Env): Promise<Resp
     const url = new URL(request.url);
     const path = url.pathname;
     const method = request.method;
+    const jsonHeaders = { 'Content-Type': 'application/json' };
 
-    // Get admin ID from header
     const adminId = request.headers.get('X-Auth-Token') || url.searchParams.get('admin_id');
 
-    if (!adminId) {
-        return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-            status: 401,
-            headers: { 'Content-Type': 'application/json' }
+    if (!adminId) throw new AuthenticationError();
+
+    if (path.endsWith('/reports') && method === 'GET') {
+        const reports = await getPendingReports(env, adminId);
+        return new Response(JSON.stringify({ success: true, data: reports }), {
+            headers: jsonHeaders
         });
     }
 
-    // GET /v2/admin/moderation/reports - Get pending reports
-    if (path.endsWith('/reports') && method === 'GET') {
-        try {
-            const reports = await getPendingReports(env, adminId);
-            return new Response(JSON.stringify({ status: 'success', reports }), {
-                headers: { 'Content-Type': 'application/json' }
-            });
-        } catch (error: any) {
-            return new Response(JSON.stringify({ error: error.message }), {
-                status: 403,
-                headers: { 'Content-Type': 'application/json' }
-            });
-        }
-    }
-
-    // POST /v2/admin/moderation/review - Review a report
     if (path.endsWith('/review') && method === 'POST') {
-        try {
-            const body = await request.json() as any;
-            if (!body.report_id || !body.action) {
-                return new Response(JSON.stringify({ error: 'Missing report_id or action' }), {
-                    status: 400,
-                    headers: { 'Content-Type': 'application/json' }
-                });
-            }
-
-            const result = await reviewReport(env, adminId, body.report_id, body.action, body.notes || '');
-            return new Response(JSON.stringify(result), {
-                status: result.success ? 200 : 400,
-                headers: { 'Content-Type': 'application/json' }
-            });
-        } catch (error) {
-            return new Response(JSON.stringify({ error: 'Invalid request' }), {
-                status: 400,
-                headers: { 'Content-Type': 'application/json' }
-            });
-        }
+        const body = ReviewReportSchema.parse(await request.json());
+        const result = await reviewReport(env, adminId, body.report_id, body.action, body.notes);
+        return new Response(JSON.stringify(result), { headers: jsonHeaders });
     }
 
-    // GET /v2/admin/moderation/stats - Get moderation stats
     if (path.endsWith('/stats') && method === 'GET') {
-        try {
-            const stats = await getModerationStats(env, adminId);
-            return new Response(JSON.stringify({ status: 'success', stats }), {
-                headers: { 'Content-Type': 'application/json' }
-            });
-        } catch (error: any) {
-            return new Response(JSON.stringify({ error: error.message }), {
-                status: 403,
-                headers: { 'Content-Type': 'application/json' }
-            });
-        }
+        const stats = await getModerationStats(env, adminId);
+        return new Response(JSON.stringify({ success: true, data: stats }), {
+            headers: jsonHeaders
+        });
     }
 
-    return new Response('Method not allowed', { status: 405 });
+    throw new AppError('Method not allowed', 405, 'METHOD_NOT_ALLOWED');
 }
