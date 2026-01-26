@@ -22,7 +22,7 @@ id = "be22cab4461942bdac552afd7215a0fd"
 # R2 Bucket Binding (Photos/Videos)
 [[r2_buckets]]
 binding = "MEDIA_BUCKET"
-bucket_name = "lovevibes"
+bucket_name = "love-vibes-media"
 
 # Durable Objects (Real-time Chat & Lobbies)
 [[durable_objects.bindings]]
