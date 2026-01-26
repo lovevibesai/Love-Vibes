@@ -19,6 +19,23 @@ export async function handleUserUpdate(request: Request, env: Env): Promise<Resp
 
     const url = new URL(request.url);
 
+    // 0. Get Profile (GET /user/profile)
+    if (url.pathname === '/user/profile' && request.method === 'GET') {
+        const row = await env.DB.prepare(
+            `SELECT id, email, name, birth_date, bio, gender, interested_in, job_title, company, school,
+             main_photo_url, photo_urls, video_intro_url, credits_balance, subscription_tier, subscription_expires_at,
+             is_verified, verification_status, is_id_verified, trust_score, is_onboarded, mode,
+             city, location, hometown, height, relationship_goals, interests, drinking, smoking,
+             exercise_frequency, diet, pets, languages, ethnicity, religion, has_children, wants_children, star_sign,
+             last_active FROM Users WHERE id = ?`
+        ).bind(userId).first();
+
+        if (!row) {
+            return new Response(JSON.stringify({ error: 'User not found' }), { status: 404, headers: { 'Content-Type': 'application/json' } });
+        }
+        return new Response(JSON.stringify(row), { headers: { 'Content-Type': 'application/json' } });
+    }
+
     // 1. Location Ping (POST /user/ping)
     // This updates the user's Geoshard (S2 Cell)
     if (url.pathname === '/user/ping' && request.method === 'POST') {

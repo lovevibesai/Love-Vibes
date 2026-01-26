@@ -24,6 +24,16 @@ function getRpId(env: Env): string {
 
 const RP_NAME = 'Love Vibes';
 
+function base64ToBase64URL(b64: string): string {
+    return b64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+function base64URLToBase64(b64url: string): string {
+    let b64 = b64url.replace(/-/g, '+').replace(/_/g, '/');
+    const pad = b64.length % 4;
+    if (pad) b64 += '='.repeat(4 - pad);
+    return b64;
+}
+
 export async function handleAuth(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
     const path = url.pathname;
@@ -113,16 +123,120 @@ export async function handleAuth(request: Request, env: Env): Promise<Response> 
                 "INSERT OR REPLACE INTO UserCredentials (id, user_id, public_key, counter) VALUES (?, ?, ?, ?)"
             ).bind(Buffer.from(credentialID).toString('base64'), finalUserId, Buffer.from(credentialPublicKey).toString('base64'), counter).run();
 
+            const userRow = await env.DB.prepare("SELECT is_onboarded FROM Users WHERE id = ?").bind(finalUserId).first() as { is_onboarded?: number } | null;
+            const isOnboarded = !!userRow?.is_onboarded;
+
             const token = await issueToken(finalUserId, env);
             return new Response(JSON.stringify({
                 success: true,
                 token,
                 user_id: finalUserId,
-                is_new_user: isNewUser
+                _id: finalUserId,
+                is_new_user: isNewUser,
+                is_onboarded: isOnboarded,
             }));
         }
 
         return new Response("Verification failed", { status: 400 });
+    }
+
+    // A2. Passkey Login Options (GET /v2/auth/login/options)
+    if (path === '/v2/auth/login/options') {
+        const email = url.searchParams.get('email') || undefined;
+        let allowCredentials: { id: string; type: 'public-key'; transports?: ('internal' | 'hybrid')[] }[] | undefined;
+
+        if (email) {
+            const userRow = await env.DB.prepare("SELECT id FROM Users WHERE email = ?").bind(email).first() as { id: string } | null;
+            if (userRow) {
+                const creds = await env.DB.prepare("SELECT id FROM UserCredentials WHERE user_id = ?")
+                    .bind(userRow.id).all();
+                allowCredentials = (creds.results || []).map((r: any) => ({
+                    id: base64ToBase64URL(r.id),
+                    type: 'public-key' as const,
+                    transports: ['internal', 'hybrid'],
+                }));
+            }
+        }
+
+        const options = await generateAuthenticationOptions({
+            rpID: getRpId(env),
+            allowCredentials,
+            userVerification: 'preferred',
+        });
+
+        const challengeId = crypto.randomUUID();
+        await env.DB.prepare(
+            "INSERT INTO AuthChallenges (id, challenge, user_id, type, expires_at) VALUES (?, ?, ?, ?, ?)"
+        ).bind(challengeId, options.challenge, '', 'login', Date.now() + 60000).run();
+
+        return new Response(JSON.stringify(options), { headers: { 'Content-Type': 'application/json' } });
+    }
+
+    // A3. Verify Passkey Login (POST /v2/auth/login/verify)
+    if (path === '/v2/auth/login/verify' && request.method === 'POST') {
+        const body = await request.json() as any;
+        const { response } = body;
+        if (!response || !response.id) {
+            return new Response(JSON.stringify({ success: false, error: 'Invalid response' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+        }
+
+        const credIdBase64 = base64URLToBase64(response.id);
+        const credRow = await env.DB.prepare(
+            "SELECT id, user_id, public_key, counter FROM UserCredentials WHERE id = ? OR id = ?"
+        ).bind(credIdBase64, response.id).first() as { id: string; user_id: string; public_key: string; counter: number } | null;
+
+        if (!credRow) {
+            return new Response(JSON.stringify({ success: false, error: 'Unknown passkey' }), { status: 401, headers: { 'Content-Type': 'application/json' } });
+        }
+
+        const challengeRow = await env.DB.prepare(
+            "SELECT challenge FROM AuthChallenges WHERE type = 'login' AND expires_at > ? ORDER BY expires_at DESC LIMIT 1"
+        ).bind(Date.now()).first();
+
+        if (!challengeRow) {
+            return new Response(JSON.stringify({ success: false, error: 'Challenge expired' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+        }
+
+        const publicKeyBytes = Uint8Array.from(Buffer.from(credRow.public_key, 'base64'));
+        const credential = {
+            id: response.id,
+            publicKey: publicKeyBytes,
+            counter: credRow.counter,
+        };
+
+        const verification = await verifyAuthenticationResponse({
+            response,
+            expectedChallenge: challengeRow.challenge as string,
+            expectedOrigin: [
+                'https://love-vibes-frontend.pages.dev',
+                'https://2428c90c.love-vibes-frontend.pages.dev',
+                `https://${getRpId(env)}`,
+                'http://localhost:3000',
+                'http://localhost:3001',
+            ],
+            expectedRPID: getRpId(env),
+            credential,
+        });
+
+        if (!verification.verified) {
+            return new Response(JSON.stringify({ success: false, error: 'Verification failed' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+        }
+
+        await env.DB.prepare("UPDATE UserCredentials SET counter = ? WHERE id = ?")
+            .bind(verification.authenticationInfo.newCounter, credRow.id).run();
+
+        const userId = credRow.user_id;
+        const userRow = await env.DB.prepare("SELECT id, is_onboarded FROM Users WHERE id = ?").bind(userId).first() as { id: string; is_onboarded?: number } | null;
+        const isOnboarded = !!userRow?.is_onboarded;
+
+        const token = await issueToken(userId, env);
+        return new Response(JSON.stringify({
+            success: true,
+            token,
+            user_id: userId,
+            _id: userId,
+            is_onboarded: isOnboarded,
+        }), { headers: { 'Content-Type': 'application/json' } });
     }
 
     // --- EMAIL OTP FALLBACK ---
@@ -148,24 +262,26 @@ export async function handleAuth(request: Request, env: Env): Promise<Response> 
 
         if (storedOtp && storedOtp === otp) {
             // Find or Create User
-            let user: any = await env.DB.prepare("SELECT id, name FROM Users WHERE email = ?").bind(email).first();
+            let user: any = await env.DB.prepare("SELECT id, name, is_onboarded FROM Users WHERE email = ?").bind(email).first();
             let isNewUser = false;
             if (!user) {
                 const newId = crypto.randomUUID();
                 await env.DB.prepare("INSERT INTO Users (id, email, created_at) VALUES (?, ?, ?)").bind(newId, email, Date.now()).run();
-                user = { id: newId };
+                user = { id: newId, is_onboarded: 0 };
                 isNewUser = true;
             } else {
-                // Check if user has completed profile (has name)
                 isNewUser = !user.name;
             }
 
             const token = await issueToken(user.id, env);
+            const isOnboarded = !!user.is_onboarded;
             return new Response(JSON.stringify({
                 success: true,
                 token,
+                user_id: user.id,
+                _id: user.id,
                 is_new_user: isNewUser,
-                _id: user.id
+                is_onboarded: isOnboarded,
             }));
         }
 
