@@ -2,18 +2,19 @@
 
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { Heart, Activity } from "lucide-react"
+import { Heart, Activity, ChevronLeft } from "lucide-react"
 import { motion } from "framer-motion"
 
 interface ChemistryTestProps {
     isActive: boolean
     onComplete: (avgHeartRate: number) => void
+    onCancel?: () => void
 }
 
-export function ChemistryTest({ isActive, onComplete }: ChemistryTestProps) {
+export function ChemistryTest({ isActive, onComplete, onCancel }: ChemistryTestProps) {
     const [heartRate, setHeartRate] = useState(0)
     const [readings, setReadings] = useState<number[]>([])
-    const [countdown, setCountdown] = useState(60)
+    const [countdown, setCountdown] = useState(30)
 
     useEffect(() => {
         if (!isActive) return
@@ -31,7 +32,9 @@ export function ChemistryTest({ isActive, onComplete }: ChemistryTestProps) {
                 if (prev <= 1) {
                     clearInterval(interval)
                     clearInterval(timer)
-                    const avgHR = readings.reduce((a, b) => a + b, 0) / readings.length
+                    const avgHR = readings.length > 0
+                        ? readings.reduce((a, b) => a + b, 0) / readings.length
+                        : 0;
                     onComplete(avgHR)
                     return 0
                 }
@@ -51,7 +54,15 @@ export function ChemistryTest({ isActive, onComplete }: ChemistryTestProps) {
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <div className="bg-card rounded-3xl p-8 max-w-md w-full">
                 {/* Header */}
-                <div className="text-center mb-8">
+                <div className="relative text-center mb-8">
+                    {onCancel && (
+                        <button
+                            onClick={onCancel}
+                            className="absolute -top-2 -left-2 w-10 h-10 flex items-center justify-center rounded-full bg-white/5 hover:bg-white/10 transition-colors"
+                        >
+                            <ChevronLeft className="w-6 h-6 text-foreground" />
+                        </button>
+                    )}
                     <div className="w-20 h-20 rounded-full bg-gradient-to-br from-rose-500 to-pink-500 flex items-center justify-center mx-auto mb-4">
                         <Heart className="w-10 h-10 text-white fill-current animate-pulse" />
                     </div>
@@ -100,14 +111,24 @@ export function ChemistryTest({ isActive, onComplete }: ChemistryTestProps) {
                     </div>
                 </div>
 
-                {/* Countdown */}
-                <div className="text-center">
-                    <div className="text-sm text-muted-foreground mb-2">
-                        Test completes in
+                {/* Countdown & Actions */}
+                <div className="flex flex-col items-center gap-4">
+                    <div className="text-center">
+                        <div className="text-sm text-muted-foreground mb-1">
+                            Test completes in
+                        </div>
+                        <div className="text-4xl font-black text-rose-500 font-mono">
+                            {countdown}s
+                        </div>
                     </div>
-                    <div className="text-3xl font-bold text-primary font-mono">
-                        {countdown}s
-                    </div>
+
+                    <Button
+                        onClick={onCancel}
+                        variant="ghost"
+                        className="text-rose-500 hover:text-rose-600 hover:bg-rose-500/10 font-bold uppercase tracking-widest text-xs"
+                    >
+                        Stop Protocol
+                    </Button>
                 </div>
 
                 {/* Progress Bar */}
@@ -115,7 +136,7 @@ export function ChemistryTest({ isActive, onComplete }: ChemistryTestProps) {
                     <motion.div
                         className="h-full bg-gradient-to-r from-rose-500 to-pink-500"
                         initial={{ width: "0%" }}
-                        animate={{ width: `${((60 - countdown) / 60) * 100}%` }}
+                        animate={{ width: `${((30 - countdown) / 30) * 100}%` }}
                         transition={{ duration: 0.3 }}
                     />
                 </div>

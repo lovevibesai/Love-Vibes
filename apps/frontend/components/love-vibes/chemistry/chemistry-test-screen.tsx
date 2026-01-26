@@ -185,7 +185,11 @@ export function ChemistryTestScreen() {
             </div>
 
             {/* Chemistry Test Component */}
-            <ChemistryTest isActive={isTestActive} onComplete={handleComplete} />
+            <ChemistryTest
+                isActive={isTestActive}
+                onComplete={handleComplete}
+                onCancel={() => setIsTestActive(false)}
+            />
         </div>
     )
 }

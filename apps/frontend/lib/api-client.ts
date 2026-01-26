@@ -215,5 +215,22 @@ export const api = {
                 body: JSON.stringify({ userId, scenarioType })
             });
         }
+    },
+    chemistry: {
+        startTest: async (matchId: string, targetId: string) => {
+            return apiRequest('/v2/chemistry/start', {
+                method: 'POST',
+                body: JSON.stringify({ matchId, targetId })
+            });
+        },
+        submitData: async (testId: string, readings: any[]) => {
+            return apiRequest('/v2/chemistry/data', {
+                method: 'POST',
+                body: JSON.stringify({ testId, readings })
+            });
+        },
+        getResults: async (testId: string) => {
+            return apiRequest(`/v2/chemistry/results?testId=${testId}`);
+        }
     }
 };
