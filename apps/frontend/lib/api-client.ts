@@ -271,5 +271,23 @@ export const api = {
                 body: JSON.stringify({ userId, responses })
             });
         }
+    },
+    chat: {
+        getIcebreakers: async (withUserId: string) => {
+            return apiRequest(`/v2/chat/icebreakers?with_user_id=${withUserId}`);
+        }
+    },
+    boost: {
+        activate: async () => {
+            return apiRequest('/v2/boost/activate', { method: 'POST' });
+        },
+        getStatus: async () => {
+            return apiRequest('/v2/boost/status');
+        }
+    },
+    social: {
+        getMutualFriends: async (targetId: string) => {
+            return apiRequest(`/v2/social/mutual?targetId=${targetId}`);
+        }
     }
 };

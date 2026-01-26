@@ -19,7 +19,7 @@ export function IcebreakerPanel({ withUserId, onSelect, onClose }: IcebreakerPan
         setIsLoading(true)
         try {
             const res = await api.chat.getIcebreakers(withUserId)
-            if (res.status === "success") {
+            if (res && res.icebreakers) {
                 setIcebreakers(res.icebreakers)
             }
         } catch (err) {
