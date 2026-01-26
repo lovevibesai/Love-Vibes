@@ -3,6 +3,7 @@ import type { Metadata, Viewport } from 'next'
 import { Inter, Playfair_Display } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { ThemeProvider } from "@/components/theme-provider"
+import { FirebaseInit } from "@/components/firebase-init"
 import './globals.css'
 
 const inter = Inter({
@@ -41,15 +42,6 @@ export const metadata: Metadata = {
     images: ['/logo.png'],
   },
 }
-
-const FirebaseInit = () => {
-  React.useEffect(() => {
-    import('@/lib/firebase').then(({ initAnalytics }) => {
-      initAnalytics();
-    });
-  }, []);
-  return null;
-};
 
 export default function RootLayout({
   children,
