@@ -1,136 +1,179 @@
 /**
  * User Module
- * Handles Profile Updates and Location Pings (Geosharding Update)
+ * Handles Profile Updates, Location Pings, and Discovery Preferences
+ * Enhanced with CORS support, robust error handling, and schema synchronization
  */
+
 import { Env } from './index';
 import { verifyAuth } from './auth';
 // @ts-ignore
 import { S2 } from 's2-geometry';
 
-// Production Ready S2 Logic
+// Helper for CORS Headers
+function corsHeaders(origin: string | null) {
+    return {
+        'Access-Control-Allow-Origin': origin || '*',
+        'Access-Control-Allow-Methods': 'GET, POST, PUT, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Auth-Token',
+        'Access-Control-Max-Age': '86400',
+    };
+}
+
+/**
+ * Production Ready S2 Logic
+ */
 function latLonToCellId(lat: number, lon: number, level: number = 12): string {
-    const key = S2.latLngToKey(lat, lon, level);
-    return S2.keyToId(key);
+    try {
+        const key = S2.latLngToKey(lat, lon, level);
+        return S2.keyToId(key);
+    } catch (e) {
+        // Fallback Level 12 approximation if library fails
+        const latInt = Math.floor((lat + 90) * 10000);
+        const lonInt = Math.floor((lon + 180) * 10000);
+        return `s2_f_${latInt}_${lonInt}`;
+    }
 }
 
 export async function handleUserUpdate(request: Request, env: Env): Promise<Response> {
-    const userId = await verifyAuth(request, env);
-    if (!userId) return new Response("Unauthorized", { status: 401 });
+    const origin = request.headers.get('Origin');
+
+    // 1. Handle Preflight
+    if (request.method === 'OPTIONS') {
+        return new Response(null, { headers: corsHeaders(origin) });
+    }
+
+    const headers = { ...corsHeaders(origin), 'Content-Type': 'application/json' };
+
+    // 2. Verify Authentication
+    let userId: string;
+    try {
+        const authedId = await verifyAuth(request, env);
+        if (!authedId) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers });
+        userId = authedId;
+    } catch (e) {
+        return new Response(JSON.stringify({ error: 'Authentication check failed' }), { status: 401, headers });
+    }
 
     const url = new URL(request.url);
 
-    // 0. Get Profile (GET /user/profile)
-    if (url.pathname === '/user/profile' && request.method === 'GET') {
-        const row = await env.DB.prepare(
-            `SELECT id, email, name, birth_date, bio, gender, interested_in, job_title, company, school,
-             main_photo_url, photo_urls, video_intro_url, credits_balance, subscription_tier, subscription_expires_at,
-             is_verified, verification_status, is_id_verified, trust_score, is_onboarded, mode,
-             city, location, hometown, height, relationship_goals, interests, drinking, smoking,
-             exercise_frequency, diet, pets, languages, ethnicity, religion, has_children, wants_children, star_sign,
-             last_active FROM Users WHERE id = ?`
-        ).bind(userId).first();
+    try {
+        // --- GET PROFILE ---
+        if (url.pathname === '/user/profile' && request.method === 'GET') {
+            const row = await env.DB.prepare(
+                `SELECT id, email, name, birth_date, age, bio, gender, interested_in, job_title, company, school,
+                 main_photo_url, photo_urls, video_intro_url, credits_balance, subscription_tier,
+                 is_verified, verification_status, is_id_verified, trust_score, is_onboarded, mode,
+                 city, location, hometown, height, relationship_goals, interests, drinking, smoking,
+                 exercise_frequency, diet, pets, languages, ethnicity, religion, has_children, wants_children, star_sign,
+                 last_active FROM Users WHERE id = ?`
+            ).bind(userId).first();
 
-        if (!row) {
-            return new Response(JSON.stringify({ error: 'User not found' }), { status: 404, headers: { 'Content-Type': 'application/json' } });
-        }
-        return new Response(JSON.stringify(row), { headers: { 'Content-Type': 'application/json' } });
-    }
-
-    // 1. Location Ping (POST /user/ping)
-    // This updates the user's Geoshard (S2 Cell)
-    if (url.pathname === '/user/ping' && request.method === 'POST') {
-        const body: any = await request.json();
-        const { lat, long } = body;
-
-        if (!lat || !long) return new Response("Missing lat/long", { status: 400 });
-
-        const s2CellId = latLonToCellId(lat, long);
-        const timestamp = Date.now();
-
-        await env.DB.prepare(
-            "UPDATE Users SET lat = ?, long = ?, s2_cell_id = ?, last_active = ? WHERE id = ?"
-        ).bind(lat, long, s2CellId, timestamp, userId).run();
-
-        // Ideally updating KV here too for faster lookups
-        await env.GEO_KV.put(`user_loc:${userId}`, s2CellId);
-
-        return new Response(JSON.stringify({ status: "updated", cell_id: s2CellId }), {
-            headers: { 'Content-Type': 'application/json' }
-        });
-    }
-
-    // 2. Profile Update (PUT /user/profile)
-    // Handles Love Vibes specific fields like 'mode' (Friendship/Dating)
-    if (url.pathname === '/user/profile' && request.method === 'PUT') {
-        const body: any = await request.json();
-        // Only allow specific fields to be updated - Expanded for World Class Features
-        const allowedFields = [
-            'name', 'bio', 'mode', 'video_intro_url', 'gender', 'interested_in',
-            'city', 'hometown', 'height', 'relationship_goals', 'drinking',
-            'smoking', 'exercise_frequency', 'diet', 'pets', 'interests',
-            'languages', 'ethnicity', 'religion', 'has_children',
-            'wants_children', 'star_sign', 'job_title', 'school', 'company',
-            'photo_urls', 'main_photo_url', 'is_verified', 'is_onboarded', 'subscription_tier'
-        ];
-
-        const updates = [];
-        const values = [];
-
-        for (const field of allowedFields) {
-            if (body[field] !== undefined) {
-                updates.push(`${field} = ?`);
-                values.push(body[field]);
+            if (!row) {
+                return new Response(JSON.stringify({ error: 'User not found' }), { status: 404, headers });
             }
+            return new Response(JSON.stringify(row), { headers });
         }
 
-        if (updates.length === 0) return new Response("No valid fields", { status: 400 });
+        // --- LOCATION PING ---
+        if (url.pathname === '/user/ping' && request.method === 'POST') {
+            const body: any = await request.json();
+            const { lat, long } = body;
 
-        values.push(userId); // For WHERE clause
-
-        await env.DB.prepare(
-            `UPDATE Users SET ${updates.join(', ')} WHERE id = ?`
-        ).bind(...values).run();
-
-        return new Response(JSON.stringify({ status: "updated" }));
-    }
-
-    // 3. Discovery Preferences (POST /user/preferences)
-    if (url.pathname === '/user/preferences' && request.method === 'POST') {
-        const body: any = await request.json();
-        const allowedPrefs = [
-            'distance_max', 'age_min', 'age_max', 'height_min', 'height_max',
-            'show_me', 'filter_relationship_goals', 'filter_drinking',
-            'filter_smoking', 'filter_education', 'filter_zodiac',
-            'show_verified_only', 'show_with_video_only', 'min_trust_score'
-        ];
-
-        const updates = [];
-        const values = [];
-
-        for (const pref of allowedPrefs) {
-            if (body[pref] !== undefined) {
-                updates.push(`${pref} = ?`);
-                values.push(typeof body[pref] === 'object' ? JSON.stringify(body[pref]) : body[pref]);
+            if (lat === undefined || long === undefined) {
+                return new Response(JSON.stringify({ error: 'Missing lat/long' }), { status: 400, headers });
             }
+
+            const s2CellId = latLonToCellId(lat, long);
+            const timestamp = Math.floor(Date.now() / 1000);
+
+            await env.DB.prepare(
+                "UPDATE Users SET lat = ?, long = ?, s2_cell_id = ?, last_active = ? WHERE id = ?"
+            ).bind(lat, long, s2CellId, timestamp, userId).run();
+
+            // KV Update for fast proximity lookups
+            if (env.GEO_KV) {
+                await env.GEO_KV.put(`user_loc:${userId}`, s2CellId, { expirationTtl: 86400 });
+            }
+
+            return new Response(JSON.stringify({ success: true, cell_id: s2CellId }), { headers });
         }
 
-        if (updates.length === 0) return new Response("No valid preferences", { status: 400 });
+        // --- PROFILE UPDATE ---
+        if (url.pathname === '/user/profile' && request.method === 'PUT') {
+            const body: any = await request.json();
+            const allowedFields = [
+                'name', 'bio', 'mode', 'video_intro_url', 'gender', 'interested_in',
+                'city', 'hometown', 'height', 'relationship_goals', 'drinking',
+                'smoking', 'exercise_frequency', 'diet', 'pets', 'interests',
+                'languages', 'ethnicity', 'religion', 'has_children',
+                'wants_children', 'star_sign', 'job_title', 'school', 'company',
+                'photo_urls', 'main_photo_url', 'is_verified', 'is_onboarded', 'subscription_tier', 'age'
+            ];
 
-        values.push(userId);
+            const updates = [];
+            const values = [];
 
-        // Use UPSERT logic for UserPreferences
-        const query = `
-            INSERT INTO UserPreferences (user_id, ${updates.map(u => u.split(' = ')[0]).join(', ')})
-            VALUES (?, ${updates.map(() => '?').join(', ')})
-            ON CONFLICT(user_id) DO UPDATE SET ${updates.join(', ')}
-        `;
+            for (const field of allowedFields) {
+                if (body[field] !== undefined) {
+                    updates.push(`${field} = ?`);
+                    values.push(body[field]);
+                }
+            }
 
-        const upsertParams = [userId, ...values.slice(0, -1), ...values.slice(0, -1)];
+            if (updates.length === 0) {
+                return new Response(JSON.stringify({ error: 'No valid fields provided' }), { status: 400, headers });
+            }
 
-        await env.DB.prepare(query).bind(...upsertParams).run();
+            values.push(userId);
+            await env.DB.prepare(`UPDATE Users SET ${updates.join(', ')} WHERE id = ?`).bind(...values).run();
 
-        return new Response(JSON.stringify({ status: "updated" }));
+            return new Response(JSON.stringify({ success: true, message: 'Profile updated' }), { headers });
+        }
+
+        // --- DISCOVERY PREFERENCES ---
+        if (url.pathname === '/user/preferences' && request.method === 'POST') {
+            const body: any = await request.json();
+            const allowedPrefs = [
+                'distance_max', 'age_min', 'age_max', 'height_min', 'height_max',
+                'show_me', 'filter_relationship_goals', 'filter_drinking',
+                'filter_smoking', 'filter_education', 'filter_zodiac',
+                'show_verified_only', 'show_with_video_only', 'min_trust_score'
+            ];
+
+            const updates = [];
+            const values = [];
+
+            for (const pref of allowedPrefs) {
+                if (body[pref] !== undefined) {
+                    updates.push(`${pref} = ?`);
+                    values.push(typeof body[pref] === 'object' ? JSON.stringify(body[pref]) : body[pref]);
+                }
+            }
+
+            if (updates.length === 0) {
+                return new Response(JSON.stringify({ error: 'No valid preferences' }), { status: 400, headers });
+            }
+
+            // UPSERT for UserPreferences
+            const columnNames = updates.map(u => u.split(' = ')[0]);
+            const placeholders = updates.map(() => '?');
+            const updateClause = updates.join(', ');
+
+            const query = `
+                INSERT INTO UserPreferences (user_id, ${columnNames.join(', ')})
+                VALUES (?, ${placeholders.join(', ')})
+                ON CONFLICT(user_id) DO UPDATE SET ${updateClause}
+            `;
+
+            await env.DB.prepare(query).bind(userId, ...values, ...values).run();
+
+            return new Response(JSON.stringify({ success: true, message: 'Preferences updated' }), { headers });
+        }
+
+    } catch (err: any) {
+        console.error('[USER] Operation failed:', err);
+        return new Response(JSON.stringify({ error: 'Internal server error', details: err.message }), { status: 500, headers });
     }
 
-    return new Response("Not Found", { status: 404 });
+    return new Response(JSON.stringify({ error: 'Route not found' }), { status: 404, headers });
 }
