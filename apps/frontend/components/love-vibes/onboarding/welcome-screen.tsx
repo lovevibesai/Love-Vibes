@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button"
 import { Phone, Mail, Moon, Sun, ShieldCheck } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { useTheme } from "next-themes"
+import { auth, googleProvider } from "@/lib/firebase"
+import { signInWithPopup } from "firebase/auth"
 
 interface Particle {
   id: number
@@ -273,19 +275,12 @@ export function WelcomeScreen() {
             <button
               onClick={async () => {
                 try {
-                  // Firebase Google Sign-In
-                  const { auth, googleProvider } = await import('@/lib/firebase');
-                  const { signInWithPopup } = await import('firebase/auth');
-
                   const result = await signInWithPopup(auth, googleProvider);
                   const idToken = await result.user.getIdToken();
-
-                  // Send to backend
                   await loginWithGoogle(idToken);
                 } catch (error: any) {
                   console.error("Google Sign-In failed:", error);
                   if (error.code !== 'auth/popup-closed-by-user') {
-                    // Fallback to phone screen on error (except user cancel)
                     setCurrentScreen("phone");
                   }
                 }
