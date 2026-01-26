@@ -3,7 +3,9 @@
 
 import { Env } from './index'
 import { z } from 'zod';
-import { AuthenticationError, ValidationError, AppError } from './errors';
+import { AuthenticationError, ValidationError, AppError, NotFoundError } from './errors';
+import { logger } from './logger';
+import { verifyAuth } from './auth';
 
 // Zod Schemas
 const EnableProximitySchema = z.object({
@@ -49,6 +51,7 @@ export async function enableProximity(
             .bind(userId, enabled, now, enabled, now)
             .run()
 
+        logger.info('proximity_toggled', undefined, { userId, enabled });
         return {
             success: true,
             message: enabled ? 'Proximity alerts enabled' : 'Proximity alerts disabled',
@@ -79,7 +82,6 @@ export async function updateLocation(
         const nearbyMatches = await findNearbyMatches(env, userId, lat, long)
 
         if (nearbyMatches.length > 0) {
-            // Create proximity alerts
             const alerts = await createProximityAlerts(env, userId, nearbyMatches)
             return { success: true, nearby_matches: alerts }
         }
@@ -96,7 +98,6 @@ async function findNearbyMatches(
     userLat: number,
     userLong: number
 ): Promise<Array<{ user_id: string; distance: number; lat: number; long: number }>> {
-    // Get user's matches who have proximity enabled
     const matches = await env.DB.prepare(
         `SELECT DISTINCT 
        CASE 
@@ -121,10 +122,9 @@ async function findNearbyMatches(
 
     const nearby: Array<{ user_id: string; distance: number; lat: number; long: number }> = []
 
-    for (const match of matches.results as any[]) {
+    for (const match of (matches.results || []) as any[]) {
         const distance = calculateDistance(userLat, userLong, match.current_lat, match.current_long)
         if (distance <= 500) {
-            // Within 500 meters
             nearby.push({
                 user_id: match.match_id,
                 distance: Math.round(distance),
@@ -143,22 +143,19 @@ async function createProximityAlerts(
     nearbyMatches: Array<{ user_id: string; distance: number; lat: number; long: number }>
 ): Promise<ProximityAlert[]> {
     const now = Math.floor(Date.now() / 1000)
-    const expiresAt = now + 1800 // 30 minutes
+    const expiresAt = now + 1800
 
     const alerts: ProximityAlert[] = []
 
     for (const match of nearbyMatches) {
-        // Get match details
         const matchUser = await env.DB.prepare('SELECT name, main_photo_url FROM Users WHERE id = ?')
             .bind(match.user_id)
             .first()
 
         if (!matchUser) continue
 
-        // Find nearby venue (mock for now - integrate with Google Places API)
         const venue = await findNearbyVenue(match.lat, match.long)
 
-        // Create alert
         const alertId = crypto.randomUUID()
         await env.DB.prepare(
             `INSERT INTO ProximityAlerts 
@@ -179,7 +176,7 @@ async function createProximityAlerts(
             )
             .run()
 
-        alerts.push({
+        const alert = {
             id: alertId,
             match_name: matchUser.name as string,
             match_photo: matchUser.main_photo_url as string,
@@ -188,17 +185,16 @@ async function createProximityAlerts(
             venue_address: venue.address,
             venue_type: venue.type,
             expires_at: expiresAt,
-        })
-
-        // Send push notification
-        // await sendPushNotification(match.user_id, ...)
+        };
+        alerts.push(alert)
+        logger.info('proximity_alert_created', undefined, { alertId, userId, matchId: match.user_id });
     }
 
     return alerts
 }
 
 function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
-    const R = 6371e3 // Earth's radius in meters
+    const R = 6371e3
     const φ1 = (lat1 * Math.PI) / 180
     const φ2 = (lat2 * Math.PI) / 180
     const Δφ = ((lat2 - lat1) * Math.PI) / 180
@@ -217,8 +213,6 @@ async function findNearbyVenue(lat: number, long: number): Promise<{
     address: string
     type: string
 }> {
-    // TODO: Integrate with Google Places API
-    // For now, return mock venue
     return {
         name: 'Starbucks',
         address: '123 Main St',
@@ -238,6 +232,7 @@ export async function respondToProximityAlert(
             .bind(response, alertId, userId)
             .run()
 
+        logger.info('proximity_response', undefined, { alertId, userId, response });
         return { success: true, message: response === 'accepted' ? 'Meetup confirmed!' : 'Declined' }
     } catch (error: any) {
         throw new AppError('Failed to respond to proximity alert', 500, 'PROXIMITY_RESPOND_FAILED', error);
@@ -245,7 +240,6 @@ export async function respondToProximityAlert(
 }
 
 export async function handleProximity(request: Request, env: Env): Promise<Response> {
-    const { verifyAuth } = await import('./auth');
     const userId = await verifyAuth(request, env);
     if (!userId) throw new AuthenticationError();
 
@@ -254,26 +248,28 @@ export async function handleProximity(request: Request, env: Env): Promise<Respo
     const method = request.method;
     const jsonHeaders = { 'Content-Type': 'application/json' };
 
-    if (path === '/v2/proximity/enable' && method === 'POST') {
-        const body = EnableProximitySchema.parse(await request.json());
-        const result = await enableProximity(env, userId, body.enabled);
-        return new Response(JSON.stringify(result), { headers: jsonHeaders });
+    try {
+        if (path === '/v2/proximity/enable' && method === 'POST') {
+            const body = EnableProximitySchema.parse(await request.json());
+            const result = await enableProximity(env, userId, body.enabled);
+            return new Response(JSON.stringify({ success: true, data: result }), { headers: jsonHeaders });
+        }
+
+        if (path === '/v2/proximity/update' && method === 'POST') {
+            const body = UpdateLocationSchema.parse(await request.json());
+            const result = await updateLocation(env, userId, body.lat, body.long);
+            return new Response(JSON.stringify({ success: true, data: result }), { headers: jsonHeaders });
+        }
+
+        if (path === '/v2/proximity/respond' && method === 'POST') {
+            const body = RespondAlertSchema.parse(await request.json());
+            const result = await respondToProximityAlert(env, body.alert_id, userId, body.response);
+            return new Response(JSON.stringify({ success: true, data: result }), { headers: jsonHeaders });
+        }
+    } catch (e: any) {
+        if (e instanceof z.ZodError) throw new ValidationError(e.errors[0].message);
+        throw e;
     }
 
-    if (path === '/v2/proximity/update' && method === 'POST') {
-        const body = UpdateLocationSchema.parse(await request.json());
-        const result = await updateLocation(env, userId, body.lat, body.long);
-        return new Response(JSON.stringify(result), { headers: jsonHeaders });
-    }
-
-    if (path === '/v2/proximity/respond' && method === 'POST') {
-        const body = RespondAlertSchema.parse(await request.json());
-        const result = await respondToProximityAlert(env, body.alert_id, userId, body.response);
-        return new Response(JSON.stringify(result), { headers: jsonHeaders });
-    }
-
-    return new Response(JSON.stringify({ error: 'Route not found' }), {
-        status: 404,
-        headers: jsonHeaders
-    });
+    throw new NotFoundError("Proximity route");
 }

@@ -5,7 +5,7 @@
 import { Env } from './index';
 import { verifyAuth } from './auth';
 import { z } from 'zod';
-import { ValidationError, AuthenticationError, AppError } from './errors';
+import { ValidationError, AuthenticationError, AppError, NotFoundError } from './errors';
 import { logger } from './logger';
 
 // Zod Schemas
@@ -27,123 +27,107 @@ export async function handleBilling(request: Request, env: Env): Promise<Respons
     const path = url.pathname;
     const jsonHeaders = { 'Content-Type': 'application/json' };
 
-    // 1. Purchase Credits (POST /v2/billing/purchase-credits)
-    if (path === '/v2/billing/purchase-credits' && request.method === 'POST') {
-        const body = PurchaseCreditsSchema.parse(await request.json());
-        const { package_id, payment_token } = body;
+    try {
+        // 1. Purchase Credits (POST /v2/billing/purchase-credits)
+        if (path.endsWith('/purchase-credits') && request.method === 'POST') {
+            const body = PurchaseCreditsSchema.parse(await request.json());
+            const { package_id } = body;
 
-        // In production, validate payment_token with Stripe/Apple/Google
-        // For this blueprint, we simulate high-integrity success
+            const packages: Record<string, number> = {
+                'starter': 50,
+                'popular': 120,
+                'premium': 300,
+                'ultimate': 1000
+            };
 
-        const packages: Record<string, number> = {
-            'starter': 50,
-            'popular': 120,
-            'premium': 300,
-            'ultimate': 1000
-        };
+            const creditsToGrant = packages[package_id];
+            const timestamp = Date.now();
+            const transactionId = crypto.randomUUID();
 
-        const creditsToGrant = packages[package_id];
+            await env.DB.batch([
+                env.DB.prepare("UPDATE Users SET credits_balance = credits_balance + ? WHERE id = ?").bind(creditsToGrant, userId),
+                env.DB.prepare(
+                    "INSERT INTO Transactions (id, user_id, type, amount, credits_granted, status, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?)"
+                ).bind(transactionId, userId, 'credit_purchase', 0, creditsToGrant, 'COMPLETED', timestamp)
+            ]);
 
-        const timestamp = Date.now();
-        const transactionId = crypto.randomUUID();
+            logger.info('credits_purchased', undefined, { userId, packageId: package_id, creditsAdded: creditsToGrant });
+            return new Response(JSON.stringify({
+                success: true,
+                data: {
+                    credits_added: creditsToGrant,
+                    transaction_id: transactionId
+                }
+            }), { headers: jsonHeaders });
+        }
 
-        await env.DB.batch([
-            env.DB.prepare("UPDATE Users SET credits_balance = credits_balance + ? WHERE id = ?").bind(creditsToGrant, userId),
-            env.DB.prepare(
-                "INSERT INTO Transactions (id, user_id, type, amount, credits_granted, status, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?)"
-            ).bind(transactionId, userId, 'credit_purchase', 0, creditsToGrant, 'COMPLETED', timestamp)
-        ]);
+        // 2. Subscribe (POST /v2/billing/subscribe)
+        if (path.endsWith('/subscribe') && request.method === 'POST') {
+            const body = SubscribeSchema.parse(await request.json());
+            const { tier, interval } = body;
 
-        return new Response(JSON.stringify({
-            status: "success",
-            credits_added: creditsToGrant,
-            transaction_id: transactionId
-        }), { headers: { 'Content-Type': 'application/json' } });
+            const duration = interval === 'yearly' ? 365 * 24 * 60 * 60 * 1000 : 30 * 24 * 60 * 60 * 1000;
+            const expiresAt = Date.now() + duration;
+
+            await env.DB.prepare(
+                "UPDATE Users SET subscription_tier = ?, subscription_expires_at = ? WHERE id = ?"
+            ).bind(tier, expiresAt, userId).run();
+
+            logger.info('user_subscribed', undefined, { userId, tier, interval });
+            return new Response(JSON.stringify({
+                success: true,
+                data: {
+                    tier,
+                    expires_at: expiresAt
+                }
+            }), { headers: jsonHeaders });
+        }
+
+        // 3. User Billing Info (GET /v2/billing/info)
+        if (path.endsWith('/info') && request.method === 'GET') {
+            const result = await env.DB.prepare(
+                "SELECT credits_balance, subscription_tier, subscription_expires_at FROM Users WHERE id = ?"
+            ).bind(userId).first();
+
+            if (!result) throw new NotFoundError('User');
+
+            return new Response(JSON.stringify({ success: true, data: result }), {
+                headers: jsonHeaders
+            });
+        }
+    } catch (e: any) {
+        if (e instanceof z.ZodError) throw new ValidationError(e.errors[0].message);
+        if (e instanceof AppError) throw e;
+        throw new AppError('Billing operation failed', 500, 'BILLING_ERROR', e);
     }
 
-    // 2. Subscribe (POST /v2/billing/subscribe)
-    if (path === '/v2/billing/subscribe' && request.method === 'POST') {
-        const body = SubscribeSchema.parse(await request.json());
-        const { tier, interval } = body;
-
-        const duration = interval === 'yearly' ? 365 * 24 * 60 * 60 * 1000 : 30 * 24 * 60 * 60 * 1000;
-        const expiresAt = Date.now() + duration;
-
-        await env.DB.prepare(
-            "UPDATE Users SET subscription_tier = ?, subscription_expires_at = ? WHERE id = ?"
-        ).bind(tier, expiresAt, userId).run();
-
-        return new Response(JSON.stringify({
-            status: "success",
-            tier,
-            expires_at: expiresAt
-        }), { headers: { 'Content-Type': 'application/json' } });
-    }
-
-    // 3. User Billing Info (GET /v2/billing/info)
-    if (path === '/v2/billing/info' && request.method === 'GET') {
-        const { results } = await env.DB.prepare(
-            "SELECT credits_balance, subscription_tier, subscription_expires_at FROM Users WHERE id = ?"
-        ).bind(userId).all();
-
-        return new Response(JSON.stringify(results[0]), {
-            headers: { 'Content-Type': 'application/json' }
-        });
-    }
-
-    return new Response(JSON.stringify({ error: 'Route not found' }), {
-        status: 404,
-        headers: jsonHeaders
-    });
+    throw new AppError('Route not found', 404, 'NOT_FOUND');
 }
 
-/**
- * STRIPE WEBHOOK HANDLER
- * CRITICAL: Verifies webhook signature to prevent spoofing/replay attacks
- * 
- * Endpoint: POST /v2/billing/webhook
- * Called from index.ts BEFORE auth verification (webhooks are server-to-server)
- */
 export async function handleStripeWebhook(request: Request, env: Env): Promise<Response> {
     const signature = request.headers.get('stripe-signature');
     const webhookSecret = (env as any).STRIPE_WEBHOOK_SECRET;
 
-    // CRITICAL: Reject unsigned webhooks
-    if (!signature) {
-        logger.error('stripe_webhook_security', 'Missing signature');
-        throw new AuthenticationError('Missing Stripe signature');
-    }
-
-    if (!webhookSecret) {
-        logger.error('stripe_webhook_config', 'STRIPE_WEBHOOK_SECRET not configured');
-        throw new AppError('Webhook not configured', 503, 'CONFIG_ERROR');
-    }
+    if (!signature) throw new AuthenticationError('Missing Stripe signature');
+    if (!webhookSecret) throw new AppError('Webhook not configured', 503, 'CONFIG_ERROR');
 
     const body = await request.text();
-
-    // Verify Stripe signature (simplified - use stripe library in production)
     const isValid = await verifyStripeSignature(body, signature, webhookSecret);
 
-    if (!isValid) {
-        logger.error('stripe_webhook_security', 'Invalid Stripe signature');
-        throw new AuthenticationError('Invalid Stripe signature');
-    }
+    if (!isValid) throw new AuthenticationError('Invalid Stripe signature');
 
     const event = JSON.parse(body);
 
-    // Idempotency: Check if we've already processed this event
     const existingEvent = await env.DB.prepare(
         'SELECT id FROM ProcessedWebhooks WHERE event_id = ?'
     ).bind(event.id).first();
 
     if (existingEvent) {
-        console.log(`Webhook ${event.id} already processed - skipping (idempotent)`);
-        return new Response(JSON.stringify({ received: true, idempotent: true }), {
+        return new Response(JSON.stringify({ success: true, message: 'Already processed' }), {
             headers: { 'Content-Type': 'application/json' }
         });
     }
 
-    // Process the event
     try {
         switch (event.type) {
             case 'checkout.session.completed':
@@ -156,34 +140,25 @@ export async function handleStripeWebhook(request: Request, env: Env): Promise<R
             case 'customer.subscription.deleted':
                 await handleSubscriptionCanceled(env, event.data.object);
                 break;
-            case 'invoice.payment_failed':
-                await handlePaymentFailed(env, event.data.object);
-                break;
             default:
-                console.log(`Unhandled webhook event type: ${event.type}`);
+                logger.info('unhandled_webhook_type', undefined, { type: event.type });
         }
 
-        // Mark event as processed (prevents double-processing on retry)
         await env.DB.prepare(
             'INSERT INTO ProcessedWebhooks (event_id, event_type, processed_at) VALUES (?, ?, ?)'
         ).bind(event.id, event.type, Date.now()).run();
 
+        return new Response(JSON.stringify({ success: true }), {
+            headers: { 'Content-Type': 'application/json' }
+        });
     } catch (error: any) {
-        logger.error('stripe_webhook_error', error, { eventId: event.id, eventType: event.type });
-        throw error; // Let global handler handle it
+        logger.error('stripe_webhook_error', error, { eventId: event.id });
+        throw error;
     }
-
-    return new Response(JSON.stringify({ received: true }), {
-        headers: { 'Content-Type': 'application/json' }
-    });
 }
 
-/**
- * Verify Stripe webhook signature using HMAC-SHA256
- */
 async function verifyStripeSignature(payload: string, signature: string, secret: string): Promise<boolean> {
     try {
-        // Parse Stripe signature header: t=timestamp,v1=signature
         const parts = signature.split(',').reduce((acc, part) => {
             const [key, value] = part.split('=');
             acc[key] = value;
@@ -195,14 +170,9 @@ async function verifyStripeSignature(payload: string, signature: string, secret:
 
         if (!timestamp || !expectedSig) return false;
 
-        // Check timestamp (reject if > 5 minutes old)
         const age = Date.now() / 1000 - parseInt(timestamp);
-        if (age > 300) {
-            console.error('Stripe webhook timestamp too old - possible replay attack');
-            return false;
-        }
+        if (age > 300) return false;
 
-        // Compute expected signature
         const signedPayload = `${timestamp}.${payload}`;
         const encoder = new TextEncoder();
         const key = await crypto.subtle.importKey(
@@ -220,24 +190,18 @@ async function verifyStripeSignature(payload: string, signature: string, secret:
 
         return computedSig === expectedSig;
     } catch (e) {
-        console.error('Signature verification error:', e);
         return false;
     }
 }
 
-// Webhook event handlers
 async function handleCheckoutComplete(env: Env, session: any) {
     const userId = session.client_reference_id;
     const creditsToGrant = parseInt(session.metadata?.credits || '0');
 
     if (userId && creditsToGrant > 0) {
-        await env.DB.prepare(
-            'UPDATE Users SET credits_balance = credits_balance + ? WHERE id = ?'
-        ).bind(creditsToGrant, userId).run();
-
-        await env.DB.prepare(
-            'INSERT INTO Transactions (id, user_id, type, amount, credits_granted, status, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?)'
-        ).bind(crypto.randomUUID(), userId, 'credit_purchase', session.amount_total / 100, creditsToGrant, 'COMPLETED', Date.now()).run();
+        await env.DB.prepare('UPDATE Users SET credits_balance = credits_balance + ? WHERE id = ?').bind(creditsToGrant, userId).run();
+        await env.DB.prepare('INSERT INTO Transactions (id, user_id, type, amount, credits_granted, status, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?)')
+            .bind(crypto.randomUUID(), userId, 'credit_purchase', session.amount_total / 100, creditsToGrant, 'COMPLETED', Date.now()).run();
     }
 }
 
@@ -245,30 +209,14 @@ async function handleSubscriptionUpdate(env: Env, subscription: any) {
     const userId = subscription.metadata?.user_id;
     const tier = subscription.metadata?.tier || 'plus';
     const expiresAt = subscription.current_period_end * 1000;
-
     if (userId) {
-        await env.DB.prepare(
-            'UPDATE Users SET subscription_tier = ?, subscription_expires_at = ? WHERE id = ?'
-        ).bind(tier, expiresAt, userId).run();
+        await env.DB.prepare('UPDATE Users SET subscription_tier = ?, subscription_expires_at = ? WHERE id = ?').bind(tier, expiresAt, userId).run();
     }
 }
 
 async function handleSubscriptionCanceled(env: Env, subscription: any) {
     const userId = subscription.metadata?.user_id;
-
     if (userId) {
-        await env.DB.prepare(
-            'UPDATE Users SET subscription_tier = ?, subscription_expires_at = NULL WHERE id = ?'
-        ).bind('free', userId).run();
-    }
-}
-
-async function handlePaymentFailed(env: Env, invoice: any) {
-    const userId = invoice.subscription_details?.metadata?.user_id;
-
-    if (userId) {
-        // Log payment failure for follow-up
-        console.error(`Payment failed for user ${userId}`);
-        // Could send notification, downgrade access, etc.
+        await env.DB.prepare('UPDATE Users SET subscription_tier = ?, subscription_expires_at = NULL WHERE id = ?').bind('free', userId).run();
     }
 }

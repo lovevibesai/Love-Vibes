@@ -127,7 +127,7 @@ export async function handleBoost(request: Request, env: Env): Promise<Response>
                 throw new ValidationError('Invalid request body', error);
             }
             const result = await activateBoost(env, userId, body.duration_minutes);
-            return new Response(JSON.stringify(result), { headers: jsonHeaders });
+            return new Response(JSON.stringify({ success: true, data: result }), { headers: jsonHeaders });
         }
 
         if (path === '/v2/boost/status' && method === 'GET') {

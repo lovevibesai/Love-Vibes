@@ -80,6 +80,16 @@ export async function handleUserUpdate(request: Request, env: Env): Promise<Resp
     try {
         // --- GET PROFILE ---
         if (url.pathname === '/user/profile' && request.method === 'GET') {
+            // Check KV Cache
+            const cacheKey = `user_profile:${userId}`;
+            const cachedBody = await env.GEO_KV?.get(cacheKey);
+
+            if (cachedBody) {
+                return new Response(cachedBody, {
+                    headers: { 'Content-Type': 'application/json', 'X-Cache': 'HIT' }
+                });
+            }
+
             const row = await env.DB.prepare(
                 `SELECT id, email, name, birth_date, age, bio, gender, interested_in, job_title, company, school,
                  main_photo_url, photo_urls, video_intro_url, credits_balance, subscription_tier,
@@ -90,8 +100,16 @@ export async function handleUserUpdate(request: Request, env: Env): Promise<Resp
             ).bind(userId).first();
 
             if (!row) throw new NotFoundError('User');
-            return new Response(JSON.stringify(row), {
-                headers: { 'Content-Type': 'application/json' }
+
+            const responseBody = JSON.stringify({ success: true, data: row });
+
+            // Cache for 5 minutes
+            if (env.GEO_KV) {
+                await env.GEO_KV.put(cacheKey, responseBody, { expirationTtl: 300 });
+            }
+
+            return new Response(responseBody, {
+                headers: { 'Content-Type': 'application/json', 'X-Cache': 'MISS' }
             });
         }
 
@@ -135,6 +153,11 @@ export async function handleUserUpdate(request: Request, env: Env): Promise<Resp
 
             values.push(userId);
             await env.DB.prepare(`UPDATE Users SET ${updates.join(', ')} WHERE id = ?`).bind(...values).run();
+
+            // Invalidate KV Cache
+            if (env.GEO_KV) {
+                await env.GEO_KV.delete(`user_profile:${userId}`);
+            }
 
             return new Response(JSON.stringify({ success: true, message: 'Profile updated' }), {
                 headers: { 'Content-Type': 'application/json' }

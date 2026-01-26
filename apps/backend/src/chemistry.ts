@@ -2,6 +2,10 @@
 // Heart rate synchrony detection during video calls using PPG
 
 import { Env } from './index'
+import { z } from 'zod';
+import { ValidationError, AuthenticationError, AppError, NotFoundError } from './errors';
+import { logger } from './logger';
+import { verifyAuth } from './auth';
 
 export interface HeartRateData {
     timestamp: number
@@ -17,10 +21,6 @@ export interface ChemistryResult {
     message: string
 }
 
-import { z } from 'zod';
-import { ValidationError, AuthenticationError, AppError, NotFoundError } from './errors';
-
-// Zod Schemas
 const StartTestSchema = z.object({
     match_id: z.string().uuid(),
     target_id: z.string().uuid(),
@@ -28,7 +28,7 @@ const StartTestSchema = z.object({
 
 const HeartRateDataSchema = z.object({
     timestamp: z.number(),
-    bpm: z.number().min(30).max(220), // Physiological limits
+    bpm: z.number().min(30).max(220),
 });
 
 const SubmitDataSchema = z.object({
@@ -53,10 +53,10 @@ export async function startChemistryTest(
             .bind(testId, matchId, userAId, userBId, now)
             .run()
 
+        logger.info('chemistry_test_started', undefined, { testId, matchId, userAId, userBId });
         return { success: true, test_id: testId }
-    } catch (error) {
-        console.error('Failed to start chemistry test:', error)
-        return { success: false, test_id: '' }
+    } catch (error: any) {
+        throw new AppError('Failed to start chemistry test', 500, 'START_TEST_ERROR', error);
     }
 }
 
@@ -68,21 +68,18 @@ export async function submitChemistryData(
     heartRateData: HeartRateData[]
 ): Promise<{ success: boolean }> {
     try {
-        // Calculate average and variance
         const bpms = heartRateData.map((d) => d.bpm)
         const avgHr = bpms.reduce((a, b) => a + b, 0) / bpms.length
         const variance = calculateVariance(bpms)
 
-        // Determine which user (A or B)
         const test = await env.DB.prepare('SELECT user_a_id, user_b_id FROM ChemistryTests WHERE id = ?')
             .bind(testId)
             .first()
 
-        if (!test) return { success: false }
+        if (!test) throw new NotFoundError('Chemistry Test');
 
         const isUserA = test.user_a_id === userId
 
-        // Update test with user's data
         if (isUserA) {
             await env.DB.prepare(
                 'UPDATE ChemistryTests SET user_a_hr_avg = ?, user_a_hr_variance = ? WHERE id = ?'
@@ -97,10 +94,11 @@ export async function submitChemistryData(
                 .run()
         }
 
+        logger.info('chemistry_data_submitted', undefined, { testId, userId, avgHr });
         return { success: true }
-    } catch (error) {
-        console.error('Failed to submit chemistry data:', error)
-        return { success: false }
+    } catch (error: any) {
+        if (error instanceof AppError) throw error;
+        throw new AppError('Failed to submit chemistry data', 500, 'SUBMIT_DATA_ERROR', error);
     }
 }
 
@@ -111,11 +109,12 @@ export async function getChemistryResults(env: Env, testId: string): Promise<Che
             .bind(testId)
             .first()
 
-        if (!test || !test.user_a_hr_avg || !test.user_b_hr_avg) {
+        if (!test) throw new NotFoundError('Chemistry Test');
+
+        if (!test.user_a_hr_avg || !test.user_b_hr_avg) {
             return null // Test not complete
         }
 
-        // Calculate synchrony score
         const syncScore = calculateSynchronyScore(
             test.user_a_hr_avg as number,
             test.user_b_hr_avg as number,
@@ -124,13 +123,13 @@ export async function getChemistryResults(env: Env, testId: string): Promise<Che
         )
 
         const chemistryDetected = syncScore >= 70
-
-        // Update test with results
         await env.DB.prepare(
             'UPDATE ChemistryTests SET sync_score = ?, chemistry_detected = ?, test_duration = ? WHERE id = ?'
         )
             .bind(syncScore, chemistryDetected, 60, testId)
             .run()
+
+        logger.info('chemistry_results_generated', undefined, { testId, syncScore, detected: chemistryDetected });
 
         return {
             test_id: testId,
@@ -142,9 +141,9 @@ export async function getChemistryResults(env: Env, testId: string): Promise<Che
                 ? '🔥 Chemistry Detected! Your heart rates elevated and synced!'
                 : '💙 Keep getting to know each other!',
         }
-    } catch (error) {
-        console.error('Failed to get chemistry results:', error)
-        return null
+    } catch (error: any) {
+        if (error instanceof AppError) throw error;
+        throw new AppError('Failed to get chemistry results', 500, 'GET_RESULTS_ERROR', error);
     }
 }
 
@@ -154,84 +153,48 @@ function calculateVariance(values: number[]): number {
     return squaredDiffs.reduce((a, b) => a + b, 0) / values.length
 }
 
-function calculateSynchronyScore(
-    hrA: number,
-    hrB: number,
-    varA: number,
-    varB: number
-): number {
-    // Heart rate similarity (closer = higher score)
+function calculateSynchronyScore(hrA: number, hrB: number, varA: number, varB: number): number {
     const hrDiff = Math.abs(hrA - hrB)
     const hrSimilarity = Math.max(0, 100 - hrDiff * 2)
-
-    // Variance similarity (both elevated or both calm = higher score)
     const varDiff = Math.abs(varA - varB)
     const varSimilarity = Math.max(0, 100 - varDiff * 5)
-
-    // Both heart rates elevated (indicates mutual attraction)
     const elevationBonus = hrA > 75 && hrB > 75 ? 20 : 0
-
-    // Combined score
     const score = (hrSimilarity * 0.5 + varSimilarity * 0.3 + elevationBonus) * 1.2
-
     return Math.min(100, Math.round(score))
 }
 
 export async function handleChemistry(request: Request, env: Env): Promise<Response> {
-    const { verifyAuth } = await import('./auth');
     const userId = await verifyAuth(request, env);
-    if (!userId) return new Response("Unauthorized", { status: 401 });
+    if (!userId) throw new AuthenticationError();
 
     const url = new URL(request.url);
     const path = url.pathname;
     const method = request.method;
-
     const jsonHeaders = { 'Content-Type': 'application/json' };
 
-    if (path === '/v2/chemistry/start' && method === 'POST') {
-        const body = StartTestSchema.parse(await request.json());
-        const result = await startChemistryTest(env, body.match_id, userId, body.target_id);
-        if (!result.success) throw new AppError("Failed to start chemistry test", 500);
-        return new Response(JSON.stringify(result), { headers: jsonHeaders });
+    try {
+        if (path === '/v2/chemistry/start' && method === 'POST') {
+            const body = StartTestSchema.parse(await request.json());
+            const result = await startChemistryTest(env, body.match_id, userId, body.target_id);
+            return new Response(JSON.stringify({ success: true, data: result }), { headers: jsonHeaders });
+        }
+
+        if (path === '/v2/chemistry/submit' && method === 'POST') {
+            const body = SubmitDataSchema.parse(await request.json());
+            const result = await submitChemistryData(env, body.test_id, userId, body.heart_rate_data);
+            return new Response(JSON.stringify({ success: true, data: result }), { headers: jsonHeaders });
+        }
+
+        if (path.startsWith('/v2/chemistry/results/') && method === 'GET') {
+            const testId = path.split('/').pop();
+            if (!testId) throw new ValidationError("Missing test ID");
+            const result = await getChemistryResults(env, testId);
+            return new Response(JSON.stringify({ success: true, data: result }), { headers: jsonHeaders });
+        }
+    } catch (e: any) {
+        if (e instanceof z.ZodError) throw new ValidationError(e.errors[0].message);
+        throw e;
     }
 
-    if (path === '/v2/chemistry/submit' && method === 'POST') {
-        const body = SubmitDataSchema.parse(await request.json());
-        const result = await submitChemistryData(env, body.test_id, userId, body.heart_rate_data);
-        if (!result.success) throw new AppError("Failed to submit chemistry data", 500);
-        return new Response(JSON.stringify(result), { headers: jsonHeaders });
-    }
-
-    if (path.startsWith('/v2/chemistry/results/') && method === 'GET') {
-        const testId = path.split('/').pop();
-        if (!testId) throw new ValidationError("Missing test ID");
-        const result = await getChemistryResults(env, testId);
-        if (!result) throw new NotFoundError("Chemistry test results");
-        return new Response(JSON.stringify(result), { headers: jsonHeaders });
-    }
-
-    return new Response("Not Found", { status: 404 });
+    throw new NotFoundError("Chemistry route");
 }
-
-// Client-side PPG implementation helper (for frontend)
-export const PPG_INSTRUCTIONS = `
-/**
- * Photoplethysmography (PPG) - Heart Rate Detection via Camera
- * 
- * Implementation:
- * 1. Request camera access (front camera)
- * 2. Place fingertip over camera lens
- * 3. Capture video frames at 30fps
- * 4. Extract red channel intensity from each frame
- * 5. Apply bandpass filter (0.8-3 Hz for 48-180 BPM)
- * 6. Use FFT to detect dominant frequency (heart rate)
- * 7. Send BPM readings every 2 seconds
- * 
- * Libraries:
- * - getUserMedia() for camera access
- * - Canvas API for frame extraction
- * - FFT.js or similar for frequency analysis
- * 
- * Accuracy: ~95% compared to medical devices
- */
-`

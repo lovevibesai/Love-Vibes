@@ -3,8 +3,9 @@
 
 import { Env } from './index'
 import { z } from 'zod';
-import { AuthenticationError, ValidationError, AppError } from './errors';
+import { AuthenticationError, ValidationError, AppError, NotFoundError } from './errors';
 import { logger } from './logger';
+import { verifyAuth } from './auth';
 
 // Zod Schemas
 const VibeWindowSchema = z.object({
@@ -38,23 +39,18 @@ export async function setVibeWindows(
     userId: string,
     windowsRaw: any
 ): Promise<{ success: boolean; message: string }> {
-    const { windows } = SetVibeWindowsSchema.parse(windowsRaw);
-
     try {
+        const { windows } = SetVibeWindowsSchema.parse(windowsRaw);
         const now = Math.floor(Date.now() / 1000)
 
         // Delete existing windows
-        await env.DB.prepare('DELETE FROM VibeWindows WHERE user_id = ?')
-            .bind(userId)
-            .run()
+        await env.DB.prepare('DELETE FROM VibeWindows WHERE user_id = ?').bind(userId).run()
 
         // Insert new windows
         for (const window of windows) {
             await env.DB.prepare(
                 'INSERT INTO VibeWindows (user_id, day_of_week, start_hour, duration_minutes, is_active, created_at) VALUES (?, ?, ?, ?, ?, ?)'
-            )
-                .bind(userId, window.day_of_week, window.start_hour, 60, true, now)
-                .run()
+            ).bind(userId, window.day_of_week, window.start_hour, 60, true, now).run()
         }
 
         logger.info('vibe_windows_updated', undefined, { userId, count: windows.length });
@@ -72,21 +68,12 @@ export async function getVibeWindowStatus(env: Env, userId: string): Promise<Act
     const currentHour = now.getHours()
     const currentMinute = now.getMinutes()
 
-    // Get user's windows
-    const windows = await env.DB.prepare(
-        'SELECT * FROM VibeWindows WHERE user_id = ? AND is_active = TRUE'
-    )
-        .bind(userId)
-        .all()
+    const windows = await env.DB.prepare('SELECT * FROM VibeWindows WHERE user_id = ? AND is_active = TRUE').bind(userId).all()
 
     if (!windows.results || windows.results.length === 0) {
-        return {
-            is_in_window: false,
-            users_online_now: 0,
-        }
+        return { is_in_window: false, users_online_now: 0 }
     }
 
-    // Check if currently in a window
     const currentWindow = windows.results.find((w: any) => {
         if (w.day_of_week !== currentDay) return false
         const windowEnd = w.start_hour + Math.floor(w.duration_minutes / 60)
@@ -94,9 +81,7 @@ export async function getVibeWindowStatus(env: Env, userId: string): Promise<Act
     })
 
     if (currentWindow) {
-        // Count users online now
         const onlineCount = await getActiveUsersCount(env, currentDay, currentHour)
-
         return {
             is_in_window: true,
             current_window: currentWindow as unknown as VibeWindow,
@@ -104,23 +89,12 @@ export async function getVibeWindowStatus(env: Env, userId: string): Promise<Act
         }
     }
 
-    // Find next window
     const nextWindow = findNextWindow(windows.results as unknown as VibeWindow[], currentDay, currentHour, currentMinute)
 
-    return {
-        is_in_window: false,
-        next_window: nextWindow,
-        users_online_now: 0,
-    }
+    return { is_in_window: false, next_window: nextWindow, users_online_now: 0 }
 }
 
-function findNextWindow(
-    windows: VibeWindow[],
-    currentDay: number,
-    currentHour: number,
-    currentMinute: number
-): { starts_in_seconds: number; day: string; time: string } | undefined {
-    const now = new Date()
+function findNextWindow(windows: VibeWindow[], currentDay: number, currentHour: number, currentMinute: number): { starts_in_seconds: number; day: string; time: string } | undefined {
     let minDiff = Infinity
     let nextWindow: VibeWindow | undefined
 
@@ -153,41 +127,12 @@ async function getActiveUsersCount(env: Env, day: number, hour: number): Promise
      AND start_hour <= ? 
      AND (start_hour + duration_minutes / 60) > ? 
      AND is_active = TRUE`
-    )
-        .bind(day, hour, hour)
-        .first()
+    ).bind(day, hour, hour).first()
 
     return (result?.count as number) || 0
 }
 
-// Log activity during vibe window
-export async function logVibeWindowActivity(
-    env: Env,
-    userId: string,
-    activityType: 'match' | 'swipe' | 'message'
-): Promise<void> {
-    const now = Math.floor(Date.now() / 1000)
-    const windowStart = now - (now % 3600) // Round to hour
-
-    const field =
-        activityType === 'match'
-            ? 'matches_made'
-            : activityType === 'swipe'
-                ? 'swipes_made'
-                : 'messages_sent'
-
-    await env.DB.prepare(
-        `INSERT INTO VibeWindowActivity (user_id, window_start, window_end, ${field}) 
-     VALUES (?, ?, ?, 1)
-     ON CONFLICT(user_id, window_start) 
-     DO UPDATE SET ${field} = ${field} + 1`
-    )
-        .bind(userId, windowStart, windowStart + 3600)
-        .run()
-}
-
 export async function handleVibeWindows(request: Request, env: Env): Promise<Response> {
-    const { verifyAuth } = await import('./auth');
     const userId = await verifyAuth(request, env);
     if (!userId) throw new AuthenticationError();
 
@@ -196,19 +141,21 @@ export async function handleVibeWindows(request: Request, env: Env): Promise<Res
     const method = request.method;
     const jsonHeaders = { 'Content-Type': 'application/json' };
 
-    if (path === '/v2/vibe-windows/set' && method === 'POST') {
-        const body = await request.json();
-        const result = await setVibeWindows(env, userId, body);
-        return new Response(JSON.stringify(result), { headers: jsonHeaders });
+    try {
+        if (path === '/v2/vibe-windows/set' && method === 'POST') {
+            const body = await request.json();
+            const result = await setVibeWindows(env, userId, body);
+            return new Response(JSON.stringify({ success: true, data: result }), { headers: jsonHeaders });
+        }
+
+        if (path === '/v2/vibe-windows/status' && method === 'GET') {
+            const result = await getVibeWindowStatus(env, userId);
+            return new Response(JSON.stringify({ success: true, data: result }), { headers: jsonHeaders });
+        }
+    } catch (e: any) {
+        if (e instanceof z.ZodError) throw new ValidationError(e.errors[0].message);
+        throw e;
     }
 
-    if (path === '/v2/vibe-windows/status' && method === 'GET') {
-        const result = await getVibeWindowStatus(env, userId);
-        return new Response(JSON.stringify({ success: true, data: result }), { headers: jsonHeaders });
-    }
-
-    return new Response(JSON.stringify({ error: 'Route not found' }), {
-        status: 404,
-        headers: jsonHeaders
-    });
+    throw new AppError('Route not found', 404, 'NOT_FOUND');
 }

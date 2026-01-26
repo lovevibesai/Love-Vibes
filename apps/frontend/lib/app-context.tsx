@@ -206,7 +206,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [isLoggingIn, setIsLoggingIn] = useState(false)
   const { toast } = useToast()
 
-  const handleAuthenticatedUser = useCallback((data: any) => {
+  const handleAuthenticatedUser = useCallback((response: any) => {
+    // Backend now returns standardized { success: true, data: user }
+    const data = response.data || response;
+
+    if (!data.id && !data._id) {
+      console.warn("handleAuthenticatedUser received invalid user data", response);
+      return;
+    }
+
     const mappedUser = mapBackendToUser(data);
     setUser(mappedUser);
     setIsOnboarded(mappedUser.isOnboarded || false);
@@ -224,13 +232,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
       // If not onboarded, restore step
       if (prev === "welcome" || prev === "phone") {
-        const steps: AppScreen[] = ["welcome", "mode", "profile-setup", "prompts", "video", "location"];
-        return steps[mappedUser.onboardingStep || 1] || "mode";
+        const steps: AppScreen[] = ["welcome", "phone", "mode", "profile-setup", "prompts", "video", "location"];
+        return steps[mappedUser.onboardingStep || 2] || "mode";
       }
 
       return prev;
     });
-  }, []); // Empty deps - no dependency on currentScreen
+  }, []);
 
   // Session Restoration
   useEffect(() => {
@@ -337,7 +345,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     try {
       const backendUpdates = mapUserToBackend(updates);
       if (Object.keys(backendUpdates).length > 0) {
-        await api.user.updateProfile(backendUpdates);
+        const res = await api.user.updateProfile(backendUpdates);
+        if (res.success && res.data) {
+          // Sync with server data if returned
+          const mapped = mapBackendToUser(res.data);
+          setUser(mapped);
+          localStorage.setItem('user_data', JSON.stringify(mapped));
+        }
       }
     } catch (e) {
       setUser(previousUser);

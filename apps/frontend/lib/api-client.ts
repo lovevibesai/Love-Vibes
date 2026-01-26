@@ -61,8 +61,13 @@ async function apiRequest<T = any>(endpoint: string, options: RequestInit = {}):
         const data = await response.json().catch(() => ({}));
 
         if (!response.ok) {
-            const errorMessage = data.error || data.message || `API Error: ${response.statusText}`;
+            const errorMessage = data.status === 'error' ? data.message : (data.error || data.message || `API Error: ${response.statusText}`);
             throw new Error(errorMessage);
+        }
+
+        // Logic to return .data if it exists (standardized) or the whole object (for auth/older routes)
+        if (data.success && data.data !== undefined) {
+            return data.data as T;
         }
 
         return data as T;

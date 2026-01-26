@@ -24,6 +24,7 @@ import { handleRewind } from './rewind';
 import { handleSuccessStories } from './success-stories';
 import { handleRecovery } from './recovery';
 import { handleModeration } from './moderation';
+import { handleAdminMetrics } from './admin';
 import { logger } from './logger';
 import { handleApiError, AppError, ServerError, ValidationError } from './errors';
 
@@ -277,22 +278,22 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
     // 10. Profile Prompts
     if (path === '/v2/prompts' && method === 'GET') {
         const prompts = await getPrompts(env);
-        return new Response(JSON.stringify(prompts), {
-            headers: { 'Content-Type': 'application/json' }
+        return new Response(JSON.stringify({ success: true, data: prompts }), {
+            headers: jsonHeaders
         });
     }
     if (path === '/v2/user/prompts' && method === 'POST') {
         const body = await request.json() as any;
         const result = await saveUserPrompts(env, body.user_id, body.prompts);
-        return new Response(JSON.stringify(result), {
-            headers: { 'Content-Type': 'application/json' }
+        return new Response(JSON.stringify({ success: true, data: result }), {
+            headers: jsonHeaders
         });
     }
     if (path.startsWith('/v2/user/') && path.endsWith('/prompts') && method === 'GET') {
         const userId = path.split('/')[3];
         const prompts = await getUserPrompts(env, userId);
-        return new Response(JSON.stringify(prompts), {
-            headers: { 'Content-Type': 'application/json' }
+        return new Response(JSON.stringify({ success: true, data: prompts }), {
+            headers: jsonHeaders
         });
     }
 
@@ -303,7 +304,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         if (!userId) throw new ValidationError('Missing userId');
 
         const stats = await getReferralStats(env, userId);
-        return new Response(JSON.stringify(stats), {
+        return new Response(JSON.stringify({ success: true, data: stats }), {
             headers: jsonHeaders
         });
     }
@@ -312,7 +313,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         if (!body.userId || !body.scenarioType) throw new ValidationError('Missing userId or scenarioType');
 
         const result = await unlockScenario(env, body.userId, body.scenarioType);
-        return new Response(JSON.stringify(result), {
+        return new Response(JSON.stringify({ success: true, data: result }), {
             headers: jsonHeaders
         });
     }
@@ -370,6 +371,11 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
     // 22. Admin Moderation
     if (path.startsWith('/v2/admin/moderation')) {
         return await handleModeration(request, env);
+    }
+
+    // 23. Admin Metrics
+    if (path === '/v2/admin/metrics') {
+        return await handleAdminMetrics(request, env);
     }
 
     // 8. Durable Object Routes (Chat / WebSocket)

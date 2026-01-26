@@ -192,7 +192,7 @@ export async function handleVoiceMatching(request: Request, env: Env): Promise<R
         const file = formData.get('file') as unknown as File;
         if (!file) throw new ValidationError('Missing audio file');
         const result = await uploadVoiceProfile(env, userId, file);
-        return new Response(JSON.stringify(result), { headers: jsonHeaders });
+        return new Response(JSON.stringify({ success: true, data: result }), { headers: jsonHeaders });
     }
 
     if (path === '/v2/voice/feed' && method === 'GET') {
@@ -203,7 +203,7 @@ export async function handleVoiceMatching(request: Request, env: Env): Promise<R
     if (path === '/v2/voice/swipe' && method === 'POST') {
         const body = VoiceSwipeSchema.parse(await request.json());
         const result = await voiceSwipe(env, userId, body.target_id, body.action);
-        return new Response(JSON.stringify(result), { headers: jsonHeaders });
+        return new Response(JSON.stringify({ success: true, data: result }), { headers: jsonHeaders });
     }
 
     return new Response(JSON.stringify({ error: 'Route not found' }), {

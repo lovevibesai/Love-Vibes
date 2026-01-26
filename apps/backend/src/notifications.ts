@@ -4,6 +4,8 @@
 import { Env } from './index'
 import { z } from 'zod';
 import { AuthenticationError, ValidationError, AppError } from './errors';
+import { logger } from './logger';
+import { verifyAuth } from './auth';
 
 // Zod Schema
 const PushSubscriptionSchema = z.object({
@@ -14,7 +16,7 @@ const PushSubscriptionSchema = z.object({
     }),
 });
 
-export interface PushSubscription {
+export interface PushSubscriptionResponse {
     user_id: string
     endpoint: string
     p256dh: string
@@ -28,8 +30,8 @@ export async function subscribeToPush(
     userId: string,
     subscriptionRaw: any
 ): Promise<{ success: boolean; message: string }> {
-    const subscription = PushSubscriptionSchema.parse(subscriptionRaw);
     try {
+        const subscription = PushSubscriptionSchema.parse(subscriptionRaw);
         const now = Math.floor(Date.now() / 1000)
 
         // Delete old subscriptions for this user
@@ -44,12 +46,11 @@ export async function subscribeToPush(
             .bind(userId, subscription.endpoint, subscription.keys.p256dh, subscription.keys.auth, now)
             .run()
 
+        logger.info('push_subscribed', undefined, { userId, endpoint: subscription.endpoint });
         return { success: true, message: 'Subscribed to push notifications' }
-    } catch (error) {
-        if (error instanceof z.ZodError) {
-            throw new ValidationError(error.errors[0].message);
-        }
-        throw error;
+    } catch (error: any) {
+        if (error instanceof z.ZodError) throw new ValidationError(error.errors[0].message);
+        throw new AppError('Failed to subscribe to push', 500, 'SUBSCRIBE_ERROR', error);
     }
 }
 
@@ -66,33 +67,19 @@ export async function sendPushNotification(
     }
 ): Promise<{ success: boolean }> {
     try {
-        // Get user's push subscription
         const sub = await env.DB.prepare(
             'SELECT endpoint, p256dh, auth FROM PushSubscriptions WHERE user_id = ?'
         )
             .bind(userId)
             .first()
 
-        if (!sub) {
-            return { success: false }
-        }
+        if (!sub) return { success: false }
 
-        // Send push using Web Push API
-        // Note: In production, use web-push library with VAPID keys
-        const payload = JSON.stringify({
-            title: notification.title,
-            body: notification.body,
-            icon: notification.icon || '/icon-192.png',
-            badge: notification.badge || '/badge-72.png',
-            data: notification.data,
-        })
-
-        // TODO: Implement actual Web Push send
-        // await webpush.sendNotification(sub, payload)
-
+        // MOCKED: Actual send would happen here via external API or cloudflare worker service
+        logger.info('push_sent', undefined, { userId, title: notification.title });
         return { success: true }
-    } catch (error) {
-        console.error('Push notification failed:', error)
+    } catch (error: any) {
+        logger.error('push_failed', error, { userId });
         return { success: false }
     }
 }
@@ -128,7 +115,6 @@ export async function notifyProfileView(env: Env, userId: string): Promise<void>
 }
 
 export async function handleNotifications(request: Request, env: Env): Promise<Response> {
-    const { verifyAuth } = await import('./auth');
     const userId = await verifyAuth(request, env);
     if (!userId) throw new AuthenticationError();
 
@@ -137,14 +123,16 @@ export async function handleNotifications(request: Request, env: Env): Promise<R
     const method = request.method;
     const jsonHeaders = { 'Content-Type': 'application/json' };
 
-    if (path === '/v2/notifications/subscribe' && method === 'POST') {
-        const body = await request.json() as any;
-        const result = await subscribeToPush(env, userId, body.subscription);
-        return new Response(JSON.stringify(result), { headers: jsonHeaders });
+    try {
+        if (path === '/v2/notifications/subscribe' && method === 'POST') {
+            const body = await request.json() as any;
+            const result = await subscribeToPush(env, userId, body.subscription);
+            return new Response(JSON.stringify({ success: true, data: result }), { headers: jsonHeaders });
+        }
+    } catch (e: any) {
+        if (e instanceof z.ZodError) throw new ValidationError(e.errors[0].message);
+        throw e;
     }
 
-    return new Response(JSON.stringify({ error: 'Route not found' }), {
-        status: 404,
-        headers: jsonHeaders
-    });
+    throw new AppError('Route not found', 404, 'NOT_FOUND');
 }

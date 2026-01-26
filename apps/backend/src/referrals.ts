@@ -4,12 +4,7 @@
 import { Env } from './index'
 import { z } from 'zod';
 import { ValidationError, AppError, NotFoundError } from './errors';
-
-// Zod Schema
-const UnlockScenarioSchema = z.object({
-    userId: z.string().uuid(),
-    scenarioType: z.enum(['intimate', 'mystical']),
-});
+import { logger } from './logger';
 
 export interface ReferralStats {
     referral_code: string
@@ -31,12 +26,10 @@ export async function generateReferralCode(env: Env, userId: string): Promise<st
 
     if (!user) throw new NotFoundError('User')
 
-    // Generate code: FIRSTNAME + 4 random chars
-    const firstName = (user.name as string).split(' ')[0].toUpperCase()
+    const firstName = (user.name as string || 'USER').split(' ')[0].toUpperCase()
     const randomChars = Math.random().toString(36).substring(2, 6).toUpperCase()
     const code = `${firstName}${randomChars}`
 
-    // Save code
     await env.DB.prepare('UPDATE Users SET referral_code = ? WHERE id = ?')
         .bind(code, userId)
         .run()
@@ -51,14 +44,11 @@ export async function trackReferral(
     newUserId: string
 ): Promise<{ success: boolean; reward?: number }> {
     try {
-        // Find referrer
-        const referrer = await env.DB.prepare('SELECT id, scenario_keys FROM Users WHERE referral_code = ?')
+        const referrer = await env.DB.prepare('SELECT id FROM Users WHERE referral_code = ?')
             .bind(referralCode)
             .first()
 
-        if (!referrer) {
-            return { success: false }
-        }
+        if (!referrer) return { success: false }
 
         const now = Math.floor(Date.now() / 1000)
 
@@ -75,99 +65,50 @@ export async function trackReferral(
             .bind(keysReward, referrer.id)
             .run()
 
+        logger.info('referral_tracked', undefined, { referrerId: referrer.id, newUserId, reward: keysReward });
         return { success: true, reward: keysReward }
     } catch (error) {
-        console.error('Referral tracking failed:', error)
+        logger.error('referral_tracking_failed', error);
         return { success: false }
     }
 }
 
 export async function getReferralStats(env: Env, userId: string): Promise<ReferralStats> {
     try {
-        if (!env.DB) throw new AppError("Database not bound", 503, 'CONFIG_ERROR');
-
-        // Get user's referral code and keys
         const user = await env.DB.prepare('SELECT referral_code, scenario_keys FROM Users WHERE id = ?')
             .bind(userId)
             .first()
 
-        if (!user) {
-            // Return default stats for users who might not be fully initialized in DB but have valid token
-            return {
-                referral_code: "INIT-" + Math.random().toString(36).substring(2, 6).toUpperCase(),
-                total_referrals: 0,
-                successful_signups: 0,
-                available_keys: 0,
-                referrals: [],
-            }
+        if (!user) throw new NotFoundError('User');
+
+        let referralCode = user.referral_code as string;
+        if (!referralCode) {
+            referralCode = await generateReferralCode(env, userId);
         }
 
-        if (!user.referral_code) {
-            try {
-                const code = await generateReferralCode(env, userId)
-                return {
-                    referral_code: code,
-                    total_referrals: 0,
-                    successful_signups: 0,
-                    available_keys: 0,
-                    referrals: [],
-                }
-            } catch (e) {
-                // If code generation fails (e.g. read-only DB), return fallback
-                return {
-                    referral_code: "GEN-ERR",
-                    total_referrals: 0,
-                    successful_signups: 0,
-                    available_keys: 0,
-                    referrals: [],
-                }
-            }
-        }
+        const stats = await env.DB.prepare(
+            `SELECT 
+          COUNT(*) as total,
+          SUM(CASE WHEN status = 'active' OR status = 'premium' THEN 1 ELSE 0 END) as successful
+        FROM Referrals 
+        WHERE referrer_id = ?`
+        ).bind(userId).first() || { total: 0, successful: 0 };
 
-        // Get referral stats
-        let stats: any = { total: 0, successful: 0 };
-        try {
-            stats = await env.DB.prepare(
-                `SELECT 
-              COUNT(*) as total,
-              SUM(CASE WHEN status = 'active' OR status = 'premium' THEN 1 ELSE 0 END) as successful
-            FROM Referrals 
-            WHERE referrer_id = ?`
-            )
-                .bind(userId)
-                .first() || { total: 0, successful: 0 };
-        } catch (e) {
-            console.warn("Referrals table stats query failed", e);
-        }
+        const referralsResult = await env.DB.prepare(
+            `SELECT u.name, r.created_at, r.status
+         FROM Referrals r
+         JOIN Users u ON r.referred_id = u.id
+         WHERE r.referrer_id = ?
+         ORDER BY r.created_at DESC
+         LIMIT 50`
+        ).bind(userId).all();
 
-        // Get referral details
-        let referralsList: any[] = [];
-        try {
-            const referralsResult = await env.DB.prepare(
-                `SELECT u.name, r.created_at, r.status
-             FROM Referrals r
-             JOIN Users u ON r.referred_id = u.id
-             WHERE r.referrer_id = ?
-             ORDER BY r.created_at DESC
-             LIMIT 50`
-            )
-                .bind(userId)
-                .all();
-
-            if (referralsResult && referralsResult.results) {
-                referralsList = referralsResult.results;
-            } else if (Array.isArray(referralsResult)) {
-                // Handle case where client returns array directly
-                referralsList = referralsResult;
-            }
-        } catch (e) {
-            console.warn("Referrals list query failed", e);
-        }
+        const referralsList = referralsResult.results || [];
 
         return {
-            referral_code: user.referral_code as string,
-            total_referrals: (stats?.total as number) || 0,
-            successful_signups: (stats?.successful as number) || 0,
+            referral_code: referralCode,
+            total_referrals: (stats.total as number) || 0,
+            successful_signups: (stats.successful as number) || 0,
             available_keys: (user.scenario_keys as number) || 0,
             referrals: referralsList.map((r: any) => ({
                 name: r.name,
@@ -175,22 +116,14 @@ export async function getReferralStats(env: Env, userId: string): Promise<Referr
                 status: r.status,
             })),
         }
-    } catch (error) {
-        console.error("Critical error in getReferralStats:", error);
-        // Fallback to prevent 500 error on client
-        return {
-            referral_code: "VIBE-ERR",
-            total_referrals: 0,
-            successful_signups: 0,
-            available_keys: 0,
-            referrals: [],
-        }
+    } catch (error: any) {
+        if (error instanceof AppError) throw error;
+        throw new AppError('Failed to fetch referral stats', 500, 'REFERRAL_STATS_ERROR', error);
     }
 }
 
 // Unlock a scenario (spend a key)
 export async function unlockScenario(env: Env, userId: string, scenarioType: 'intimate' | 'mystical'): Promise<{ success: boolean, keysRemaining: number }> {
-    // Note: In handleRequest, we parse this with UnlockScenarioSchema
     const user = await env.DB.prepare('SELECT scenario_keys FROM Users WHERE id = ?')
         .bind(userId)
         .first()
@@ -199,15 +132,16 @@ export async function unlockScenario(env: Env, userId: string, scenarioType: 'in
         throw new AppError("Insufficient Scenario Keys", 402, 'INSUFFICIENT_KEYS');
     }
 
-    // Deduct key
-    await env.DB.prepare('UPDATE Users SET scenario_keys = scenario_keys - 1 WHERE id = ?')
-        .bind(userId)
+    const newKeys = (user.scenario_keys as number) - 1;
+
+    await env.DB.prepare('UPDATE Users SET scenario_keys = ? WHERE id = ?')
+        .bind(newKeys, userId)
         .run()
 
-    // In a real implementation, we would create a "ScenarioSession" record here
+    logger.info('scenario_unlocked', undefined, { userId, scenarioType, keysRemaining: newKeys });
 
     return {
         success: true,
-        keysRemaining: (user.scenario_keys as number) - 1
+        keysRemaining: newKeys
     }
 }

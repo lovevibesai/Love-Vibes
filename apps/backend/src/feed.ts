@@ -6,10 +6,17 @@ import { Env } from './index';
 import { verifyAuth } from './auth';
 // @ts-ignore
 import { S2 } from 's2-geometry';
-import { AuthenticationError, NotFoundError, AppError } from './errors';
+import { AuthenticationError, NotFoundError, AppError, ValidationError } from './errors';
 import { logger } from './logger';
+import { z } from 'zod';
 
-// Production Ready S2 Logic
+// Zod Schema
+const FeedRequestSchema = z.object({
+    lat: z.coerce.number().min(-90).max(90).optional(),
+    long: z.coerce.number().min(-180).max(180).optional(),
+    radius: z.coerce.number().min(1).max(500).default(50),
+});
+
 // Production Ready S2 Logic
 function latLonToCellId(lat: number, lon: number, level: number = 12): string {
     const key = S2.latLngToKey(lat, lon, level);
@@ -80,69 +87,85 @@ export async function handleFeed(request: Request, env: Env): Promise<Response> 
     const userId = await verifyAuth(request, env);
     if (!userId) throw new AuthenticationError();
 
-    // Get current user's profile to know their preferences
-    const { results: userResults } = await env.DB.prepare(
-        "SELECT * FROM Users WHERE id = ?"
-    ).bind(userId).all();
+    const url = new URL(request.url);
+    const jsonHeaders = { 'Content-Type': 'application/json' };
 
-    const currentUser: any = userResults[0];
-    if (!currentUser) throw new NotFoundError('User');
+    try {
+        const queryParams = FeedRequestSchema.parse({
+            lat: url.searchParams.get('lat'),
+            long: url.searchParams.get('long'),
+            radius: url.searchParams.get('radius')
+        });
 
-    // 1. Calculate Neighbors (Geosharding)
-    const currentCell = latLonToCellId(currentUser.lat || 0, currentUser.long || 0);
-    const cellsToQuery = getNeighboringCells(currentCell);
+        // Get current user's profile to know their preferences
+        const { results: userResults } = await env.DB.prepare(
+            "SELECT * FROM Users WHERE id = ?"
+        ).bind(userId).all();
 
-    // 2. Fetch User Discovery Metadata (Cache Key)
-    const cacheKey = `feed_cache:${currentCell}:${currentUser.mode}`;
-    let feedRaw: any[] = [];
+        const currentUser: any = userResults[0];
+        if (!currentUser) throw new NotFoundError('User');
 
-    // 3. Try KV Cache first
-    const cachedData = await env.GEO_KV.get(cacheKey);
-    if (cachedData) {
-        feedRaw = JSON.parse(cachedData);
-    } else {
-        // 4. Cache Miss - Query D1
-        const { results } = await env.DB.prepare(
-            "SELECT id, name, age, bio, photo_urls, s2_cell_id, mode, trust_score, location, relationship_goals, interests, height, drinking, smoking, exercise_frequency, diet, pets, star_sign " +
-            "FROM Users " +
-            "WHERE s2_cell_id IN (" + cellsToQuery.map(() => '?').join(',') + ") " +
-            "AND mode = ? " +
-            "LIMIT 100" // Fetch more to allow for filtering
-        ).bind(...cellsToQuery, currentUser.mode).all();
+        const lat = queryParams.lat || currentUser.lat || 0;
+        const long = queryParams.long || currentUser.long || 0;
 
-        feedRaw = results;
+        // 1. Calculate Neighbors (Geosharding)
+        const currentCell = latLonToCellId(lat, long);
+        const cellsToQuery = getNeighboringCells(currentCell);
 
-        // Save to KV for 10 minutes
-        await env.GEO_KV.put(cacheKey, JSON.stringify(feedRaw), { expirationTtl: 600 });
-    }
+        // 2. Fetch User Discovery Metadata (Cache Key)
+        const cacheKey = `feed_cache:${currentCell}:${currentUser.mode}`;
+        let feedRaw: any[] = [];
 
-    // 5. In-Memory Filtering & Match Scoring (Personalization)
-    const baseFeed = feedRaw.filter((user: any) => user.id !== userId);
+        // 3. Try KV Cache first
+        const cachedData = await env.GEO_KV.get(cacheKey);
+        if (cachedData) {
+            feedRaw = JSON.parse(cachedData);
+        } else {
+            // 4. Cache Miss - Query D1
+            const { results } = await env.DB.prepare(
+                "SELECT id, name, age, bio, photo_urls, s2_cell_id, mode, trust_score, location, relationship_goals, interests, height, drinking, smoking, exercise_frequency, diet, pets, star_sign " +
+                "FROM Users " +
+                "WHERE s2_cell_id IN (" + cellsToQuery.map(() => '?').join(',') + ") " +
+                "AND mode = ? " +
+                "AND id != ? " +
+                "LIMIT 100" // Fetch more to allow for filtering
+            ).bind(...cellsToQuery, currentUser.mode, userId).all();
 
-    // 6. Semantic Enhancement (Async Parallel)
-    const feed = await Promise.all(baseFeed.slice(0, 20).map(async (user: any) => {
-        const baseScore = calculateCompatibility(currentUser, user);
-        const semanticScore = await calculateSemanticScore(env, currentUser.bio || "", user.bio || "");
+            feedRaw = results;
 
-        return {
-            ...user,
-            compatibility_score: Math.floor((baseScore * 0.7) + (semanticScore * 0.3)),
-            match_reason: semanticScore > 80 ? "Deep personality match" : "Shared interests"
-        };
-    }));
-
-    logger.info('feed_generated', undefined, {
-        userId,
-        cellCount: cellsToQuery.length,
-        source: cachedData ? 'cache' : 'db',
-        resultsCount: feed.length
-    });
-
-    return new Response(JSON.stringify({
-        success: true,
-        data: {
-            results: feed,
-            meta: { source: cachedData ? 'cache' : 'db' }
+            // Save to KV for 10 minutes
+            await env.GEO_KV.put(cacheKey, JSON.stringify(feedRaw), { expirationTtl: 600 });
         }
-    }), { headers: { 'Content-Type': 'application/json' } });
+
+        // 5. Semantic Enhancement (Async Parallel)
+        const feed = await Promise.all(feedRaw.slice(0, 20).map(async (user: any) => {
+            const baseScore = calculateCompatibility(currentUser, user);
+            const semanticScore = await calculateSemanticScore(env, currentUser.bio || "", user.bio || "");
+
+            return {
+                ...user,
+                compatibility_score: Math.floor((baseScore * 0.7) + (semanticScore * 0.3)),
+                match_reason: semanticScore > 80 ? "Deep personality match" : "Shared interests"
+            };
+        }));
+
+        logger.info('feed_generated', undefined, {
+            userId,
+            cellCount: cellsToQuery.length,
+            source: cachedData ? 'cache' : 'db',
+            resultsCount: feed.length
+        });
+
+        return new Response(JSON.stringify({
+            success: true,
+            data: {
+                results: feed,
+                meta: { source: cachedData ? 'cache' : 'db' }
+            }
+        }), { headers: jsonHeaders });
+    } catch (e: any) {
+        if (e instanceof z.ZodError) throw new ValidationError(e.errors[0].message);
+        if (e instanceof AppError) throw e;
+        throw new AppError('Feed generation failed', 500, 'FEED_ERROR', e);
+    }
 }

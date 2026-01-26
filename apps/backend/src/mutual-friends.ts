@@ -211,7 +211,7 @@ export async function handleMutualFriends(request: Request, env: Env): Promise<R
     if (path === '/v2/social/import' && method === 'POST') {
         const body = ImportContactsSchema.parse(await request.json());
         const result = await importContacts(env, userId, body);
-        return new Response(JSON.stringify(result), { headers: jsonHeaders });
+        return new Response(JSON.stringify({ success: true, data: result }), { headers: jsonHeaders });
     }
 
     if (path.startsWith('/v2/social/mutual/') && method === 'GET') {
@@ -224,13 +224,13 @@ export async function handleMutualFriends(request: Request, env: Env): Promise<R
     if (path === '/v2/social/request-intro' && method === 'POST') {
         const body = RequestIntroSchema.parse(await request.json());
         const result = await requestIntroduction(env, userId, body.target_id, body.mutual_friend_id);
-        return new Response(JSON.stringify(result), { headers: jsonHeaders });
+        return new Response(JSON.stringify({ success: true, data: result }), { headers: jsonHeaders });
     }
 
     if (path === '/v2/social/respond-intro' && method === 'POST') {
         const body = RespondIntroSchema.parse(await request.json());
         const result = await respondToIntroduction(env, body.request_id, userId, body.response, body.message);
-        return new Response(JSON.stringify(result), { headers: jsonHeaders });
+        return new Response(JSON.stringify({ success: true, data: result }), { headers: jsonHeaders });
     }
 
     return new Response(JSON.stringify({ error: 'Route not found' }), {

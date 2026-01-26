@@ -6,6 +6,7 @@ import { Env } from './index';
 import { verifyAuth } from './auth';
 import { z } from 'zod';
 import { ValidationError, AuthenticationError, AppError } from './errors';
+import { logger } from './logger';
 
 // Zod Schema
 const GiftSchema = z.object({
@@ -62,14 +63,18 @@ export async function handleGifting(request: Request, env: Env): Promise<Respons
             ).bind(giftId, userId, recipient_id, gift_item_id, message, 'SENT', timestamp)
         ]);
 
+        const remainingCredits = user.credits_balance - giftCost;
+        logger.info('gift_sent', undefined, { userId, recipientId: recipient_id, giftItemId: gift_item_id, cost: giftCost });
+
         return new Response(JSON.stringify({
-            status: "success",
-            remaining_credits: user.credits_balance - giftCost,
-            gift_id: giftId
+            success: true,
+            data: {
+                remaining_credits: remainingCredits,
+                gift_id: giftId
+            }
         }), { headers: { 'Content-Type': 'application/json' } });
 
     } catch (e: any) {
-        // Handled by global error boundary
-        throw e;
+        throw new AppError('Gifting failed', 500, 'GIFT_ERROR', e);
     }
 }
