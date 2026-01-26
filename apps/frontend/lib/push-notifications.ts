@@ -2,7 +2,7 @@
 // This file handles Web Push notification subscription and management
 
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://love-vibes-backend.thelovevibes-ai.workers.dev';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://lovevibes.thelovevibes-ai.workers.dev';
 
 export async function registerServiceWorker() {
     if ('serviceWorker' in navigator && 'PushManager' in window) {

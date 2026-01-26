@@ -43,6 +43,7 @@ export function ReferralDashboardScreen() {
     const { setCurrentScreen, user } = useApp()
     const [stats, setStats] = useState<ReferralStats | null>(null)
     const [copied, setCopied] = useState(false)
+    const [error, setError] = useState<string | null>(null)
     const [activeTab, setActiveTab] = useState<'ambassador' | 'endorsements'>('ambassador')
 
     useEffect(() => {
@@ -51,12 +52,14 @@ export function ReferralDashboardScreen() {
 
     const loadStats = async () => {
         if (!user?.id) return
+        setError(null)
 
         try {
             const data = await api.referrals.getStats(user.id)
             setStats(data)
         } catch (error) {
             console.error("Failed to load referral stats:", error)
+            setError("The Resonance Field is currently unstable. Please re-align.")
             toast.error("Failed to load your Circle. Please try again.")
             setStats(null)
         }
@@ -105,6 +108,24 @@ export function ReferralDashboardScreen() {
         } catch (error) {
             toast.error("Failed to unlock scenario")
         }
+    }
+
+    if (error) {
+        return (
+            <div className="h-screen flex flex-col items-center justify-center bg-[#1A0814] text-white p-6 text-center">
+                <div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center mb-6 border border-red-500/20">
+                    <Zap className="w-8 h-8 text-red-500" />
+                </div>
+                <h2 className="text-xl font-black mb-2 uppercase tracking-tighter">Connection Interrupted</h2>
+                <p className="text-xs text-white/40 mb-8 max-w-[200px]">{error}</p>
+                <Button
+                    onClick={loadStats}
+                    className="bg-[#D4AF37] text-[#1A0814] font-black uppercase tracking-widest px-8"
+                >
+                    Retry Connection
+                </Button>
+            </div>
+        )
     }
 
     if (!stats) {

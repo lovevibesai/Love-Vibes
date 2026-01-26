@@ -1,7 +1,7 @@
 // API Integration Helper for Love Vibes
 // This file provides typed API calls to the backend
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://love-vibes-backend.thelovevibes-ai.workers.dev'
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://lovevibes.thelovevibes-ai.workers.dev'
 
 // Generic API call helper
 async function apiCall<T>(endpoint: string, options?: RequestInit): Promise<T> {

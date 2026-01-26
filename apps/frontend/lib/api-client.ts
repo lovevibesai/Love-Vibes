@@ -4,7 +4,7 @@
  * Enhanced for robust error handling and endpoint synchronization
  */
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://love-vibes-backend.thelovevibes-ai.workers.dev';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://lovevibes.thelovevibes-ai.workers.dev';
 
 // Types for API Responses
 interface ApiResponse<T = any> {

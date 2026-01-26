@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils"
 import { api } from "@/lib/api-client"
 import { playSound } from "@/lib/sounds"
 
-const WS_URL = process.env.NEXT_PUBLIC_WS_URL || 'wss://love-vibes-backend.thelovevibes-ai.workers.dev';
+const WS_URL = process.env.NEXT_PUBLIC_WS_URL || 'wss://lovevibes.thelovevibes-ai.workers.dev';
 
 interface Message {
   id: string
