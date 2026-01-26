@@ -32,6 +32,7 @@ import { MutualFriendsScreen } from "./social/mutual-friends-screen"
 import { BoostScreen } from "./boost/boost-screen"
 import { InnovativeFeaturesScreen } from "./settings/innovative-features-screen"
 import { IdentitySignatureScreen } from "./viral/identity-signature-screen"
+import { VisibilitySettingsScreen } from "./settings/visibility-settings-screen"
 
 
 export function LoveVibesApp() {
@@ -76,6 +77,7 @@ export function LoveVibesApp() {
         {currentScreen === "profile" && <ProfileScreen />}
 
         {currentScreen === "settings" && <SettingsScreen />}
+        {currentScreen === "visibility-settings" && <VisibilitySettingsScreen />}
         {currentScreen === "credits" && <CreditsStore />}
         {currentScreen === "notification-settings" && <NotificationSettingsScreen />}
         {currentScreen === "blocked-users" && <BlockedUsersScreen />}

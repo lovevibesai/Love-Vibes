@@ -20,9 +20,11 @@ import {
   HelpCircle,
 } from "lucide-react"
 import { api } from "@/lib/api-client"
+import { useToast } from "@/hooks/use-toast"
 
 export function SettingsScreen() {
   const { setCurrentScreen, user, updateUser } = useApp()
+  const { toast } = useToast()
   const { setTheme, resolvedTheme } = useTheme()
   const [isUpdatingLocation, setIsUpdatingLocation] = useState(false)
   const [notifications, setNotifications] = useState({
@@ -41,19 +43,50 @@ export function SettingsScreen() {
   const handleUpdateLocation = async () => {
     setIsUpdatingLocation(true)
     try {
-      const { Geolocation } = await import('@capacitor/geolocation')
-      const position = await Geolocation.getCurrentPosition()
-      const { latitude, longitude } = position.coords
+      let latitude: number;
+      let longitude: number;
+
+      // Try Capacitor Geolocation first
+      try {
+        const { Geolocation } = await import('@capacitor/geolocation')
+        const position = await Geolocation.getCurrentPosition()
+        latitude = position.coords.latitude
+        longitude = position.coords.longitude
+      } catch (capErr) {
+        console.warn("Capacitor Geolocation failed, trying browser fallback", capErr)
+
+        // Browser Fallback
+        if (!navigator.geolocation) {
+          throw new Error("Geolocation is not supported by your browser")
+        }
+
+        const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, {
+            enableHighAccuracy: true,
+            timeout: 5000,
+            maximumAge: 0
+          })
+        })
+        latitude = position.coords.latitude
+        longitude = position.coords.longitude
+      }
 
       await api.proximity.updateLocation(latitude, longitude)
 
       const locationString = `Lat: ${latitude.toFixed(2)}, Lng: ${longitude.toFixed(2)}`
-      updateUser({ ...user, userLocation: locationString })
+      updateUser({ userLocation: locationString })
 
-      alert("Location updated successfully!")
-    } catch (err) {
+      toast({
+        title: "Location Updated",
+        description: "Your resonance field has been re-aligned.",
+      })
+    } catch (err: any) {
       console.error("Failed to update location:", err)
-      alert("Could not get location. Please check your permissions.")
+      toast({
+        title: "Location Error",
+        description: err?.message || "Could not get location. Please check permissions.",
+        variant: "destructive",
+      })
     } finally {
       setIsUpdatingLocation(false)
     }
