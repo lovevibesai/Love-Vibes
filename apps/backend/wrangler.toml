@@ -1,0 +1,52 @@
+name = "lovevibes"
+main = "src/index.ts"
+compatibility_date = "2025-01-18"
+
+# Analytics Engine (LV AI Tracking)
+[[analytics_engine_datasets]]
+binding = "LV_AI"
+dataset = "lv_ai"
+
+# D1 Database Binding (User Profiles, Swipes, Matches)
+[[d1_databases]]
+binding = "DB"
+database_name = "LoveVibesDB"
+database_id = "e0f583fa-e713-487a-aad4-a34722368f05"
+migrations_dir = "../../infra/database"
+
+# KV Namespace Binding (Geosharding Map)
+[[kv_namespaces]]
+binding = "GEO_KV"
+id = "be22cab4461942bdac552afd7215a0fd"
+
+# R2 Bucket Binding (Photos/Videos)
+[[r2_buckets]]
+binding = "MEDIA_BUCKET"
+bucket_name = "lovevibes"
+
+# Durable Objects (Real-time Chat & Lobbies)
+[[durable_objects.bindings]]
+name = "CHAT_ROOM"
+class_name = "ChatRoom"
+
+[[durable_objects.bindings]]
+name = "MATCH_LOBBY"
+class_name = "MatchLobby"
+
+# Migrations for Durable Objects
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["ChatRoom", "MatchLobby"]
+
+
+[observability]
+enabled = true
+head_sampling_rate = 1
+
+
+
+
+[ai]
+binding = "AI"
+
+

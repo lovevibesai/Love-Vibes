@@ -1,0 +1,4 @@
+* @lovevibesai/core-team
+/apps/backend @lovevibesai/backend-leads
+/apps/frontend @lovevibesai/frontend-leads
+/infra/ @lovevibesai/devops

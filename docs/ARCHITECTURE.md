@@ -1,77 +1,74 @@
-# Love Vibes Architecture
+# Love Vibes - System Architecture
 
-Love Vibes is built using a modern, edge-centric architecture designed for high performance, global scalability, and real-time interaction.
+> **Architecture Style:** Edge-Native Monolith  
+> **Primary Cloud:** Cloudflare (Workers, D1, R2, Durable Objects)
 
-## System Overview
+---
 
-The platform is split into two main parts:
-1. **Frontend**: A Next.js application providing the user interface.
-2. **Backend**: A Cloudflare Workers-based API managing data, safety, and real-time features.
+## 1. High-Level Overview
 
-```mermaid
-graph TD
-    User((User))
-    
-    subgraph "Cloudflare Ecosystem"
-        Pages[Next.js + Cloudflare Pages]
-        Workers[Cloudflare Workers API]
-        D1[(Cloudflare D1 Database)]
-        R2[Cloudflare R2 Storage]
-        DO[Durable Objects - Chat/Lobbies]
-        KV[Cloudflare KV - Geosharding]
-    end
+Love Vibes is designed as a privacy-first, edge-native dating platform. Unlike traditional centralized architectures (AWS/GCP), it leverages Cloudflare's global edge network to process requests close to the user, ensuring low latency and high scalability.
 
-    User -->|HTTPS| Pages
-    User -->|API/WebSockets| Workers
-    Workers --> D1
-    Workers --> R2
-    Workers --> DO
-    Workers --> KV
-```
+### Core Components
 
-## Frontend Architecture
+| Component | Technology | Purpose |
+|-----------|------------|---------|
+| **API Layer** | Cloudflare Workers | Serverless request handling, auth, business logic |
+| **Real-time** | Durable Objects | WebSocket chat rooms, presence, stateful coordination |
+| **Database** | D1 (SQLite) | Relational user data, matches, transactions |
+| **Storage** | R2 (Object Storage) | User photos, media assets |
+| **Frontend** | Next.js (SSG/SPA) | Hosted on Cloudflare Pages |
+| **Mobile** | Capacitor | Native shell for iOS/Android |
 
-- **Next.js 16**: Utilizing the App Router for server-side rendering and efficient client-side navigation.
-- **Tailwind CSS 4.1**: A utility-first CSS framework for rapid and consistent styling.
-- **Radix UI**: Unstyled, accessible UI primitives.
-- **Framer Motion**: Powering fluid micro-animations and transitions.
+---
 
-### Key Components
-- `components/love-vibes/feed`: Discovery UI and swipe mechanics.
-- `components/love-vibes/chat`: Real-time messaging interface.
-- `components/love-vibes/safety`: User reporting and moderation UI.
+## 2. Data Flow
 
-## Backend Architecture
+### 2.1 User Request (HTTP)
+1. **Client** (App/Web) sends request to `api.lovevibes.app`
+2. **Cloudflare WAF** filters malicious traffic
+3. **Worker** routes request based on path (`/v2/auth`, `/v2/feed`)
+4. **Auth Middleware** verifies JWT via `checkAuth`
+5. **Handler** executes logic (queries D1, checks R2)
+6. **Response** sent back to user (JSON)
 
-The backend is built as a set of modular services within Cloudflare Workers.
+### 2.2 detailed Chat Flow (WebSocket)
+1. **Client** connects to `wss://api.lovevibes.app/ws/chat`
+2. **Worker** upgrades connection to WebSocket
+3. **Durable Object** (`ChatRoom`) accepts connection
+4. **State** (messages) stored in DO storage (fast access) & flushed to D1 (persistence)
+5. **Real-time** messages broadcast to connected peer
 
-### Data Storage
-- **Cloudflare D1**: SQL-based relational storage for user profiles, matches, and transactions.
-- **Cloudflare R2**: Object storage for media (photos, video profiles).
-- **Cloudflare KV**: High-speed key-value storage for location-based sharding maps.
+---
 
-### Real-time Communication
-- **Durable Objects**: Maintains state for active chat sessions and matching lobbies. Each match/chat room has a dedicated Durable Object instance for ultra-low latency.
+## 3. Edge Strategy
 
-## Key Technical Features
+We choose **Edge-Native** for specific reasons:
 
-### AI Matching Algorithm
-The matching system uses a weighted compatibility score based on:
-- Personality traits
-- Stated interests
-- Behavioral signals (swiping patterns)
-- Geographic proximity
+1. **Latency:** Matching and chat happen ms away from users.
+2. **Cost:** Significantly lower than AWS EC2/RDS.
+3. **Simplicity:** No VPCs, subnets, or load balancers to manage.
 
-### Verification System
-Multi-tiered verification stored on-chain (via hybrid architecture) ensuring:
-- **Level 1**: Basic identity (Phone/Email).
-- **Level 2**: Biometric/ID match.
-- **Level 3**: Professional/Social verification.
+### Durable Objects Usage
+- **ChatRoom:** One DO per match. Handles message routing and storage.
+- **MatchLobby:** (Future) Coordination for real-time vibe checks.
 
-### Geosharding
-Users are mapped to S2 cells (Level 12) stored in Cloudflare KV. This allows the API to quickly find active users in the same geographic vicinity without scanning the entire database.
+---
 
-## Security Design
-- **End-to-End Encryption**: Private messages are encrypted.
-- **AI Content Moderation**: Real-time screening of text and media via AI workers.
-- **Rate Limiting**: Integrated via Cloudflare's edge protection.
+## 4. Frontend Architecture
+
+- **Framework:** Next.js (App Router)
+- **Deployment:** Static Export (`output: 'export'`) to Cloudflare Pages
+- **State Management:** React Context (UserContext, WebSocketContext)
+- **Styling:** Tailwind CSS + Shadcn/UI
+- **PWA:** Fully installable PWA capabilities
+
+---
+
+## 5. Security Architecture
+
+See [Security Documentation](./security.md) for details on:
+- JWT Authentication
+- Passkey (WebAuthn) integration
+- Rate Limiting strategies
+- Content Moderation (AI-based)
