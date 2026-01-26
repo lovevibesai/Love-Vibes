@@ -214,7 +214,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     // Navigate based on onboarding status
     setCurrentScreen(prev => {
-      if (mappedUser.isOnboarded && prev === "welcome") {
+      if (mappedUser.isOnboarded && (prev === "welcome" || prev === "phone")) {
         return "feed";
       } else if (!mappedUser.isOnboarded && (prev === "welcome" || prev === "phone")) {
         return "profile-setup";
@@ -230,8 +230,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const token = localStorage.getItem('auth_token');
     const storedScreen = localStorage.getItem('current_screen') as AppScreen | null;
     const storedUser = localStorage.getItem('user_data');
+    const storedOnboarded = localStorage.getItem('is_onboarded') === 'true';
 
     if (storedScreen) setCurrentScreen(storedScreen);
+    if (storedOnboarded) setIsOnboarded(true);
     if (storedUser) {
       try { setUser(JSON.parse(storedUser)); } catch (e) { console.error(e); }
     }
@@ -317,6 +319,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const newUser = { ...user, ...updates };
     setUser(newUser);
     localStorage.setItem('user_data', JSON.stringify(newUser));
+
+    if (updates.isOnboarded !== undefined) {
+      setIsOnboarded(updates.isOnboarded);
+      localStorage.setItem('is_onboarded', updates.isOnboarded ? 'true' : 'false');
+    }
 
     try {
       const backendUpdates = mapUserToBackend(updates);

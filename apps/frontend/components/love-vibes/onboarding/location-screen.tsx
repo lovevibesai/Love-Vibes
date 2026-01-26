@@ -35,16 +35,12 @@ export function LocationScreen() {
       // Enable proximity protocol
       await api.proximity.toggle(true)
 
-      // Update local state and persist
-      if (user) {
-        updateUser({
-          ...user,
-          userLocation: `Lat: ${latitude.toFixed(2)}, Lng: ${longitude.toFixed(2)}`
-        })
-      }
+      // Update local state and persist to backend
+      await updateUser({
+        userLocation: `Lat: ${latitude.toFixed(2)}, Lng: ${longitude.toFixed(2)}`,
+        isOnboarded: true
+      })
 
-      localStorage.setItem('is_onboarded', 'true');
-      setIsOnboarded(true)
       setCurrentScreen("feed")
     } catch (err) {
       console.error("Location error:", err)
@@ -55,10 +51,12 @@ export function LocationScreen() {
     }
   }
 
-  const handleManualSubmit = () => {
+  const handleManualSubmit = async () => {
     if (city.length > 0) {
-      setIsOnboarded(true)
-      localStorage.setItem('is_onboarded', 'true');
+      await updateUser({
+        userLocation: city,
+        isOnboarded: true
+      })
       setCurrentScreen("feed")
     }
   }

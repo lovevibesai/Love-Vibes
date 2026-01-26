@@ -144,6 +144,9 @@ export const api = {
         logout: () => {
             localStorage.removeItem('auth_token');
             localStorage.removeItem('user_id');
+            localStorage.removeItem('user_data');
+            localStorage.removeItem('is_onboarded');
+            localStorage.removeItem('current_screen');
         }
     },
 
@@ -231,6 +234,20 @@ export const api = {
         },
         getResults: async (testId: string) => {
             return apiRequest(`/v2/chemistry/results?testId=${testId}`);
+        }
+    },
+    proximity: {
+        updateLocation: async (lat: number, long: number) => {
+            return apiRequest('/user/ping', {
+                method: 'POST',
+                body: JSON.stringify({ lat, long })
+            });
+        },
+        toggle: async (enabled: boolean) => {
+            return apiRequest('/v2/proximity/toggle', {
+                method: 'POST',
+                body: JSON.stringify({ enabled })
+            });
         }
     }
 };
