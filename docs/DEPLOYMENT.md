@@ -55,9 +55,15 @@ wrangler d1 execute love-vibes-db --command="SELECT name FROM sqlite_master WHER
 ### ✅ 3.1 Secrets Verification (Runtime)
 **Validation:**
 ```bash
-curl https://love-vibes-backend.workers.dev/health
+curl https://lovevibes.thelovevibes-ai.workers.dev/health
 ```
 **Expected:** `{"status": "healthy", "checks": {"secrets": "ok", ...}}`
+
+**Diagnostic Script:**
+Use the included PowerShell script for a detailed health report:
+```powershell
+./apps/backend/scripts/check_secrets.ps1
+```
 
 ### 3.2 D1 Migration Idempotency
 ```bash
@@ -96,12 +102,14 @@ for i in {1..10}; do curl -s -o /dev/null -w "%{http_code}\n" ... done
 cd apps/backend
 npm install
 wrangler deploy
+# Verify health immediately
+./scripts/check_secrets.ps1
 
 # Frontend
 cd apps/frontend
 npm install
 npm run build
-npm run pages:deploy
+npx wrangler pages deploy .vercel/output/static --project-name love-vibes-frontend
 ```
 
 ### Rollback Commands
