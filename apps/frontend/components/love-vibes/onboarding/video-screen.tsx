@@ -25,8 +25,19 @@ export function VideoScreen() {
   const [hasRecorded, setHasRecorded] = useState(false)
   const [videoBlob, setVideoBlob] = useState<Blob | null>(null)
   const [isUploading, setIsUploading] = useState(false)
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
+
+  useEffect(() => {
+    if (videoBlob) {
+      const url = URL.createObjectURL(videoBlob)
+      setPreviewUrl(url)
+      return () => URL.revokeObjectURL(url)
+    } else {
+      setPreviewUrl(null)
+    }
+  }, [videoBlob])
 
   useEffect(() => {
     let timer: NodeJS.Timeout
@@ -180,6 +191,16 @@ export function VideoScreen() {
                   className="absolute inset-0 w-full h-full object-cover scale-x-[-1]"
                 />
               )}
+              {hasRecorded && previewUrl && (
+                <video
+                  id="preview-video"
+                  src={previewUrl}
+                  autoPlay
+                  playsInline
+                  loop
+                  className="absolute inset-0 w-full h-full object-cover scale-x-[-1]"
+                />
+              )}
               <AnimatePresence mode="wait">
                 {hasRecorded ? (
                   <motion.div
@@ -188,15 +209,25 @@ export function VideoScreen() {
                     animate={{ opacity: 1, scale: 1 }}
                     className="text-center space-y-6 px-6"
                   >
-                    <div className="w-20 h-20 rounded-full bg-[#D4AF37]/20 border border-[#D4AF37]/40 flex items-center justify-center mx-auto shadow-[0_0_30px_rgba(212,175,55,0.2)]">
+                    <motion.button
+                      whileHover={{ scale: 1.1 }}
+                      whileTap={{ scale: 0.9 }}
+                      onClick={() => {
+                        // Play preview
+                        const video = document.getElementById('preview-video') as HTMLVideoElement;
+                        if (video) video.play();
+                      }}
+                      className="w-20 h-20 rounded-full bg-[#D4AF37]/20 border border-[#D4AF37]/40 flex items-center justify-center mx-auto shadow-[0_0_30px_rgba(212,175,55,0.2)]"
+                    >
                       <Play className="w-10 h-10 text-[#D4AF37]" fill="currentColor" />
-                    </div>
+                    </motion.button>
                     <div>
                       <p className="text-white font-black uppercase tracking-widest text-xs">Video Captured</p>
                       <button
                         onClick={() => {
                           setHasRecorded(false)
                           setRecordingTime(15)
+                          setVideoBlob(null)
                         }}
                         className="flex items-center gap-2 text-[#D4AF37] font-bold text-[10px] uppercase tracking-widest mt-4 mx-auto hover:opacity-80 transition-opacity"
                       >
@@ -227,9 +258,15 @@ export function VideoScreen() {
                     animate={{ opacity: 1 }}
                     className="text-center space-y-4"
                   >
-                    <div className="w-16 h-16 rounded-3xl bg-white/5 border border-white/10 flex items-center justify-center mx-auto">
-                      <Video className="w-8 h-8 text-white/20" />
-                    </div>
+                    <motion.button
+                      whileHover={{ scale: 1.1 }}
+                      whileTap={{ scale: 0.9 }}
+                      onClick={handleStartRecording}
+                      className="w-24 h-24 rounded-[32px] bg-white/5 border border-white/10 flex flex-col items-center justify-center mx-auto hover:bg-white/10 transition-all group"
+                    >
+                      <Video className="w-10 h-10 text-white/40 group-hover:text-[#D4AF37] transition-colors mb-2" />
+                      <div className="w-1.5 h-1.5 rounded-full bg-[#D4AF37] shadow-[0_0_10px_#D4AF37] animate-pulse" />
+                    </motion.button>
                     <p className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em]">Ready to record</p>
                   </motion.div>
                 )}
@@ -258,7 +295,7 @@ export function VideoScreen() {
               onClick={handleStopRecording}
               className="w-24 h-24 rounded-full border-4 border-[#7A1F3D] p-2 bg-black/40 backdrop-blur-md flex items-center justify-center shadow-[0_0_30px_#7A1F3D]"
             >
-              <div className="w-10 h-10 bg-[#7A1F3D] rounded-lg animate-pulse" />
+              <StopCircle className="w-12 h-12 text-[#7A1F3D] fill-current" />
             </motion.button>
           ) : (
             <motion.button
@@ -271,9 +308,12 @@ export function VideoScreen() {
               )}
             >
               <div className={cn(
-                "w-14 h-14 rounded-full transition-all",
+                "w-14 h-14 rounded-full transition-all flex items-center justify-center",
                 hasRecorded ? "bg-[#D4AF37]" : "bg-white/10 group-hover:bg-white/20"
-              )} />
+              )}>
+                {!hasRecorded && <Video className="w-6 h-6 text-white/40" />}
+                {hasRecorded && <Play className="w-6 h-6 text-[#1A0814]" fill="currentColor" />}
+              </div>
             </motion.button>
           )}
           <p className="text-[10px] font-black text-white/30 uppercase tracking-[0.3em]">
