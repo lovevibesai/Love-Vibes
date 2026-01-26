@@ -212,12 +212,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
     localStorage.setItem('is_onboarded', mappedUser.isOnboarded ? 'true' : 'false');
     if (mappedUser.id) localStorage.setItem('user_id', mappedUser.id);
 
-    if (mappedUser.isOnboarded && currentScreen === "welcome") {
-      setCurrentScreen("feed");
-    } else if (!mappedUser.isOnboarded && (currentScreen === "welcome" || currentScreen === "phone")) {
-      setCurrentScreen("profile-setup");
-    }
-  }, [currentScreen]);
+    // Navigate based on onboarding status
+    setCurrentScreen(prev => {
+      if (mappedUser.isOnboarded && prev === "welcome") {
+        return "feed";
+      } else if (!mappedUser.isOnboarded && (prev === "welcome" || prev === "phone")) {
+        return "profile-setup";
+      }
+      return prev;
+    });
+  }, []); // Empty deps - no dependency on currentScreen
 
   // Session Restoration
   useEffect(() => {
@@ -242,7 +246,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           }
         });
     }
-  }, [handleAuthenticatedUser]);
+  }, []); // Run only once on mount
 
   // Persist Screen
   useEffect(() => {
