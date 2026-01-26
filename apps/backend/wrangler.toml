@@ -10,8 +10,8 @@ dataset = "lv_ai"
 # D1 Database Binding (User Profiles, Swipes, Matches)
 [[d1_databases]]
 binding = "DB"
-database_name = "LoveVibesDB"
-database_id = "e0f583fa-e713-487a-aad4-a34722368f05"
+database_name = "f2aaff9451727366c5a80f56c569af0a3ea2b"
+database_id = "32063d37-8a8c-492b-9e2a-514e31db668b"
 migrations_dir = "../../infra/database"
 
 # KV Namespace Binding (Geosharding Map)
