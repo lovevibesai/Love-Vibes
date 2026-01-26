@@ -113,6 +113,33 @@ const defaultUser: User = {
   userLocation: "",
   hasVideoIntro: false,
 }
+116:
+117: export const mockUsers: User[] = [
+  118: {
+    119: id: "mock-1",
+    120: name: "Sarah",
+    121: age: 24,
+    122: bio: "Loves travel and photography",
+    123: photoUrl: "https://images.unsplash.com/photo-1494790108377-be9c29b29330",
+    124: mode: "dating",
+    125: trustScore: 90,
+    126: isVerified: true,
+    127: credits: 100
+128:
+  },
+  129: {
+    130: id: "mock-2",
+    131: name: "Jessica",
+    132: age: 27,
+    133: bio: "Coffee addict & tech enthusiast",
+    134: photoUrl: "https://images.unsplash.com/photo-1517841905240-472988babdf9",
+    135: mode: "dating",
+    136: trustScore: 85,
+    137: isVerified: true,
+    138: credits: 50
+139:
+  }
+140: ];
 
 import { api } from "./api-client"
 import { startRegistration, startAuthentication } from "@simplewebauthn/browser"
