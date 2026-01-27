@@ -4,6 +4,7 @@
     "workspaces": [
         "apps/*"
     ],
+    "packageManager": "npm@10.9.2",
     "scripts": {
         "dev:backend": "cd apps/backend && npm run dev",
         "dev:frontend": "cd apps/frontend && npm run dev",
