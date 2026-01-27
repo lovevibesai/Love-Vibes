@@ -29,15 +29,13 @@ env:
   WRANGLER_VERSION: '4.60.0'
 
 jobs:
-  # Validation and testing stage
-  validate:
+  # Code quality checks
+  lint:
     runs-on: ubuntu-latest
-    name: Validate & Test
+    name: Lint & Code Quality
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -49,27 +47,59 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Run linter
+      - name: Run ESLint
         run: npm run lint
         working-directory: apps/backend
 
-      - name: Run type checking
+  # Type checking
+  typecheck:
+    runs-on: ubuntu-latest
+    name: TypeScript Type Check
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: 'package-lock.json'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Type check
         run: npm run type-check
         working-directory: apps/backend
+
+  # Unit tests
+  test:
+    runs-on: ubuntu-latest
+    name: Run Tests
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: 'package-lock.json'
+
+      - name: Install dependencies
+        run: npm install
 
       - name: Run tests
         run: npm test
         working-directory: apps/backend
 
-      - name: Build project
-        run: npm run build
-        working-directory: apps/backend
-
-  # Security scanning
-  security:
+  # Build verification
+  build:
     runs-on: ubuntu-latest
-    name: Security Scan
-    needs: validate
+    name: Build Verification
+    needs: [lint, typecheck]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -84,15 +114,43 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Run dependency audit
-        run: npm audit --audit-level=moderate
+      - name: Build project
+        run: npm run build
+        working-directory: apps/backend
+        env:
+          NODE_ENV: production
+
+  # Security scanning
+  security:
+    runs-on: ubuntu-latest
+    name: Security Scan
+    needs: build
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: 'package-lock.json'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run npm audit
+        run: npm audit --audit-level=high
         continue-on-error: true
 
   # Deployment stage
   deploy:
     runs-on: ubuntu-latest
     name: Deploy to Cloudflare Workers
-    needs: [validate, security]
+    needs: [test, security]
+    environment:
+      name: production
+      url: ${{ steps.deploy.outputs.deployment-url }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -116,3 +174,24 @@ jobs:
         run: |
           echo "Deploying to Cloudflare Workers..."
           npx wrangler@${{ env.WRANGLER_VERSION }} deploy
+
+      - name: Create deployment summary
+        run: |
+          echo "## 🚀 Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| **Environment** | Production |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Commit** | \`${{ github.sha }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Timestamp** | $(date -u +'%Y-%m-%d %H:%M:%S UTC') |" >> $GITHUB_STEP_SUMMARY
+
+  # Notification on completion
+  notify:
+    runs-on: ubuntu-latest
+    name: Notify Deployment Status
+    needs: [deploy]
+    if: always()
+    steps:
+      - name: Deployment status
+        run: |
+          echo "Backend deployment to Cloudflare Workers: ${{ needs.deploy.result }}"

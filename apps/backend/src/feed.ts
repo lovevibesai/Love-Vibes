@@ -4,7 +4,7 @@
  */
 import { Env } from './index';
 import { verifyAuth } from './auth';
-// @ts-ignore
+// @ts-expect-error - S2 library lacks types
 import { S2 } from 's2-geometry';
 import { AuthenticationError, NotFoundError, AppError, ValidationError } from './errors';
 import { logger } from './logger';
@@ -24,7 +24,7 @@ function latLonToCellId(lat: number, lon: number, level: number = 12): string {
 }
 
 function getNeighboringCells(cellId: string): string[] {
-    const key = S2.idToKey(cellId);
+    const _key = S2.idToKey(cellId);
     return [cellId];
 }
 
@@ -38,7 +38,9 @@ function calculateCompatibility(u1: any, u2: any): number {
         const intersection = goals1.filter((g: string) => goals2.includes(g));
         if (intersection.length > 0) score += 40;
         else if (goals1.length > 0 && goals2.length > 0) score += 15; // Partial credit for having any goals set
-    } catch (e) { }
+    } catch (e) {
+        logger.error('feed_json_parse_relationship_goals_error', 'Failed to parse relationship goals', { error: e });
+    }
 
     // 2. Interests overlap (30%)
     try {
@@ -47,7 +49,9 @@ function calculateCompatibility(u1: any, u2: any): number {
         const overlap = int1.filter((i: string) => int2.includes(i));
         const overlapRatio = int1.length > 0 ? overlap.length / Math.max(int1.length, int2.length) : 0;
         score += Math.min(30, overlapRatio * 60); // Aggressive overlap bonus
-    } catch (e) { }
+    } catch (e) {
+        logger.error('feed_json_parse_interests_error', 'Failed to parse interests', { error: e });
+    }
 
     // 3. Lifestyle Compatibility (20%)
     if (u1.drinking === u2.drinking) score += 10;
@@ -78,7 +82,7 @@ async function calculateSemanticScore(env: Env, text1: string, text2: string): P
         }
         const similarity = dotProduct / (Math.sqrt(mag1) * Math.sqrt(mag2));
         return Math.floor(similarity * 100);
-    } catch (e) {
+    } catch (_e) {
         return 70; // Default sibling "vibe" if AI fails
     }
 }

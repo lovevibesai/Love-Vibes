@@ -55,8 +55,8 @@ export async function startChemistryTest(
 
         logger.info('chemistry_test_started', undefined, { testId, matchId, userAId, userBId });
         return { success: true, test_id: testId }
-    } catch (error: any) {
-        throw new AppError('Failed to start chemistry test', 500, 'START_TEST_ERROR', error);
+    } catch (error: unknown) {
+        throw new AppError('Failed to start chemistry test', 500, 'START_TEST_ERROR', error instanceof Error ? error : undefined);
     }
 }
 
@@ -96,9 +96,9 @@ export async function submitChemistryData(
 
         logger.info('chemistry_data_submitted', undefined, { testId, userId, avgHr });
         return { success: true }
-    } catch (error: any) {
+    } catch (error: unknown) {
         if (error instanceof AppError) throw error;
-        throw new AppError('Failed to submit chemistry data', 500, 'SUBMIT_DATA_ERROR', error);
+        throw new AppError('Failed to submit chemistry data', 500, 'SUBMIT_DATA_ERROR', error instanceof Error ? error : undefined);
     }
 }
 
@@ -141,9 +141,9 @@ export async function getChemistryResults(env: Env, testId: string): Promise<Che
                 ? '🔥 Chemistry Detected! Your heart rates elevated and synced!'
                 : '💙 Keep getting to know each other!',
         }
-    } catch (error: any) {
+    } catch (error: unknown) {
         if (error instanceof AppError) throw error;
-        throw new AppError('Failed to get chemistry results', 500, 'GET_RESULTS_ERROR', error);
+        throw new AppError('Failed to get chemistry results', 500, 'GET_RESULTS_ERROR', error instanceof Error ? error : undefined);
     }
 }
 
@@ -191,7 +191,7 @@ export async function handleChemistry(request: Request, env: Env): Promise<Respo
             const result = await getChemistryResults(env, testId);
             return new Response(JSON.stringify({ success: true, data: result }), { headers: jsonHeaders });
         }
-    } catch (e: any) {
+    } catch (e: unknown) {
         if (e instanceof z.ZodError) throw new ValidationError(e.errors[0].message);
         throw e;
     }

@@ -32,7 +32,7 @@ export interface SuccessStory {
 export async function submitSuccessStory(
     env: Env,
     userId: string,
-    storyRaw: any
+    storyRaw: unknown
 ): Promise<{ success: boolean; message: string }> {
     try {
         const story = SubmitStorySchema.parse(storyRaw);
@@ -79,10 +79,10 @@ export async function submitSuccessStory(
 
         logger.info('story_submitted', undefined, { userId, partnerId: story.partner_id, storyId });
         return { success: true, message: 'Story submitted for review!' }
-    } catch (error: any) {
+    } catch (error: unknown) {
         if (error instanceof z.ZodError) throw new ValidationError(error.errors[0].message);
         if (error instanceof AppError) throw error;
-        throw new AppError('Failed to submit story', 500, 'STORY_SUBMISSION_FAILED', error);
+        throw new AppError('Failed to submit story', 500, 'STORY_SUBMISSION_FAILED', error instanceof Error ? error : undefined);
     }
 }
 

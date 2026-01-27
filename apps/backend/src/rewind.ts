@@ -3,7 +3,7 @@
 
 import { Env } from './index'
 import { z } from 'zod';
-import { AuthenticationError, ValidationError, AppError } from './errors';
+import { AuthenticationError, AppError } from './errors';
 import { logger } from './logger';
 import { verifyAuth } from './auth';
 
@@ -45,7 +45,7 @@ export async function undoLastSwipe(
     env: Env,
     userId: string,
     isPremium: boolean
-): Promise<{ success: boolean; message: string; profile?: any }> {
+): Promise<{ success: boolean; message: string; profile?: Record<string, unknown> }> {
     const history = swipeHistory.get(userId)
 
     if (!history || history.length === 0) {
@@ -100,10 +100,10 @@ export async function undoLastSwipe(
             .first()
 
         logger.info('swipe_undone', undefined, { userId, targetId: lastSwipe.target_id });
-        return { success: true, message: 'Swipe undone', profile }
-    } catch (error: any) {
+        return { success: true, message: 'Swipe undone', profile: profile ?? undefined }
+    } catch (error: unknown) {
         if (error instanceof AppError) throw error;
-        throw new AppError('Failed to undo swipe', 500, 'UNDO_FAILED', error);
+        throw new AppError('Failed to undo swipe', 500, 'UNDO_FAILED', error instanceof Error ? error : undefined);
     }
 }
 

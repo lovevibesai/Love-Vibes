@@ -28,7 +28,7 @@ export interface PushSubscriptionResponse {
 export async function subscribeToPush(
     env: Env,
     userId: string,
-    subscriptionRaw: any
+    subscriptionRaw: unknown
 ): Promise<{ success: boolean; message: string }> {
     try {
         const subscription = PushSubscriptionSchema.parse(subscriptionRaw);
@@ -48,9 +48,9 @@ export async function subscribeToPush(
 
         logger.info('push_subscribed', undefined, { userId, endpoint: subscription.endpoint });
         return { success: true, message: 'Subscribed to push notifications' }
-    } catch (error: any) {
+    } catch (error: unknown) {
         if (error instanceof z.ZodError) throw new ValidationError(error.errors[0].message);
-        throw new AppError('Failed to subscribe to push', 500, 'SUBSCRIBE_ERROR', error);
+        throw new AppError('Failed to subscribe to push', 500, 'SUBSCRIBE_ERROR', error instanceof Error ? error : undefined);
     }
 }
 
@@ -63,7 +63,7 @@ export async function sendPushNotification(
         body: string
         icon?: string
         badge?: string
-        data?: any
+        data?: unknown
     }
 ): Promise<{ success: boolean }> {
     try {
@@ -85,8 +85,8 @@ export async function sendPushNotification(
         });
 
         return { success: true }
-    } catch (error: any) {
-        logger.error('push_failed', error, { userId });
+    } catch (error: unknown) {
+        logger.error('push_failed', error instanceof Error ? error : undefined, { userId });
         return { success: false }
     }
 }
@@ -132,11 +132,11 @@ export async function handleNotifications(request: Request, env: Env): Promise<R
 
     try {
         if (path === '/v2/notifications/subscribe' && method === 'POST') {
-            const body = await request.json() as any;
+            const body = await request.json() as { subscription: unknown };
             const result = await subscribeToPush(env, userId, body.subscription);
             return new Response(JSON.stringify({ success: true, data: result }), { headers: jsonHeaders });
         }
-    } catch (e: any) {
+    } catch (e: unknown) {
         if (e instanceof z.ZodError) throw new ValidationError(e.errors[0].message);
         throw e;
     }

@@ -88,7 +88,7 @@ export class ChatRoom {
             return new Response(JSON.stringify({ success: true, messages: limited }), {
                 headers: { 'Content-Type': 'application/json' }
             });
-        } catch (err) {
+        } catch (_err) {
             return new Response(JSON.stringify({ success: false, error: 'Failed to load history' }), {
                 status: 500,
                 headers: { 'Content-Type': 'application/json' }
@@ -178,7 +178,7 @@ export class ChatRoom {
             )
                 .bind(message.id, this.matchId, message.sender_id, message.text, message.type, message.timestamp)
                 .run();
-        } catch (err) {
+        } catch (_err) {
             // Silent fail for database persistence - DO storage is primary
             logger.warn('chat_db_persist_failed', 'Failed to persist message to D1', { messageId: message.id });
         }
@@ -244,7 +244,7 @@ export class MatchLobby {
             }), {
                 headers: { 'Content-Type': 'application/json' }
             });
-        } catch (err) {
+        } catch (_err) {
             return new Response(JSON.stringify({ success: false, error: 'Invalid request' }), {
                 status: 400,
                 headers: { 'Content-Type': 'application/json' }
@@ -265,7 +265,7 @@ export class MatchLobby {
             }), {
                 headers: { 'Content-Type': 'application/json' }
             });
-        } catch (err) {
+        } catch (_err) {
             return new Response(JSON.stringify({ success: false, error: 'Invalid request' }), {
                 status: 400,
                 headers: { 'Content-Type': 'application/json' }

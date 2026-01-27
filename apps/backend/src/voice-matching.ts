@@ -70,8 +70,8 @@ export async function uploadVoiceProfile(
             .run()
 
         return { success: true, message: 'Voice profile created!', voice_url: voiceUrl }
-    } catch (error: any) {
-        throw new AppError('Failed to upload voice profile', 500, 'VOICE_UPLOAD_FAILED', error);
+    } catch (error: unknown) {
+        throw new AppError('Failed to upload voice profile', 500, 'VOICE_UPLOAD_FAILED', error instanceof Error ? error : undefined);
     }
 }
 
@@ -95,11 +95,11 @@ export async function getVoiceFeed(
         .bind(userId, userId, limit)
         .all()
 
-    return results.results.map((r: any) => ({
-        user_id: r.user_id,
-        voice_url: r.voice_url,
-        duration: r.duration,
-        overall_score: (r.tone_score + r.pace_score + r.emotion_score) / 3,
+    return (results.results || []).map((r: Record<string, unknown>) => ({
+        user_id: String(r.user_id),
+        voice_url: String(r.voice_url),
+        duration: Number(r.duration),
+        overall_score: (Number(r.tone_score) + Number(r.pace_score) + Number(r.emotion_score)) / 3,
         photos_unlocked: false,
     }))
 }
@@ -165,8 +165,8 @@ export async function voiceSwipe(
         }
 
         return { success: true, mutual_match: false, photos_unlocked: false }
-    } catch (error: any) {
-        throw new AppError('Failed to process voice swipe', 500, 'VOICE_SWIPE_FAILED', error);
+    } catch (error: unknown) {
+        throw new AppError('Failed to process voice swipe', 500, 'VOICE_SWIPE_FAILED', error instanceof Error ? error : undefined);
     }
 }
 
@@ -183,9 +183,9 @@ async function analyzeVoice(env: Env, audioFile: File): Promise<{
         const audioArray = new Uint8Array(await audioFile.arrayBuffer());
 
         // 1. Transcription using Whisper
-        const transcriptionResult: any = await env.AI.run('@cf/openai/whisper', {
+        const transcriptionResult = await env.AI.run('@cf/openai/whisper', {
             audio: Array.from(audioArray)
-        });
+        }) as { text?: string };
         const transcription = transcriptionResult.text || "No transcription available";
 
         // 2. Intelligence Analysis using Llama 3.1
@@ -200,9 +200,9 @@ async function analyzeVoice(env: Env, audioFile: File): Promise<{
     
     Only return the JSON object, NO extra text.`;
 
-        const aiAnalysis: any = await env.AI.run('@cf/meta/llama-3.1-8b-instruct', {
+        const aiAnalysis = await env.AI.run('@cf/meta/llama-3.1-8b-instruct' as any, {
             messages: [{ role: 'user', content: prompt }]
-        });
+        }) as { response?: string, content?: string };
 
         let scores = { tone_score: 75, pace_score: 75, emotion_score: 75, authenticity_score: 85 };
         try {

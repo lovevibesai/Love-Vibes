@@ -6,10 +6,11 @@
 
 import { Env } from './index';
 import { verifyAuth } from './auth';
-// @ts-ignore
+// @ts-expect-error - S2 library lacks types
 import { S2 } from 's2-geometry';
 import { z } from 'zod';
-import { ValidationError, NotFoundError, AppError, AuthenticationError } from './errors';
+import { ValidationError, NotFoundError, AuthenticationError } from './errors';
+import { logger } from './logger';
 
 // Zod Schemas
 const ProfileUpdateSchema = z.object({
@@ -61,6 +62,7 @@ function latLonToCellId(lat: number, lon: number, level: number = 12): string {
         const key = S2.latLngToKey(lat, lon, level);
         return S2.keyToId(key);
     } catch (e) {
+        logger.error('user_latlon_to_cellid_error', 'S2 library failed', { error: e });
         // Fallback Level 12 approximation if library fails
         const latInt = Math.floor((lat + 90) * 10000);
         const lonInt = Math.floor((lon + 180) * 10000);
@@ -77,131 +79,128 @@ export async function handleUserUpdate(request: Request, env: Env): Promise<Resp
     const url = new URL(request.url);
     const jsonHeaders = { 'Content-Type': 'application/json' };
 
-    try {
-        // --- GET PROFILE ---
-        if (url.pathname === '/user/profile' && request.method === 'GET') {
-            // Check KV Cache
-            const cacheKey = `user_profile:${userId}`;
-            const cachedBody = await env.GEO_KV?.get(cacheKey);
 
-            if (cachedBody) {
-                return new Response(cachedBody, {
-                    headers: { 'Content-Type': 'application/json', 'X-Cache': 'HIT' }
-                });
-            }
+    // --- GET PROFILE ---
+    if (url.pathname === '/user/profile' && request.method === 'GET') {
+        // Check KV Cache
+        const cacheKey = `user_profile:${userId}`;
+        const cachedBody = await env.GEO_KV?.get(cacheKey);
 
-            const row = await env.DB.prepare(
-                `SELECT id, email, name, birth_date, age, bio, gender, interested_in, job_title, company, school,
+        if (cachedBody) {
+            return new Response(cachedBody, {
+                headers: { 'Content-Type': 'application/json', 'X-Cache': 'HIT' }
+            });
+        }
+
+        const row = await env.DB.prepare(
+            `SELECT id, email, name, birth_date, age, bio, gender, interested_in, job_title, company, school,
                  main_photo_url, photo_urls, video_intro_url, credits_balance, subscription_tier,
                  is_verified, verification_status, is_id_verified, trust_score, is_onboarded, onboarding_step, mode,
                  city, location, hometown, height, relationship_goals, interests, drinking, smoking,
                  exercise_frequency, diet, pets, languages, ethnicity, religion, has_children, wants_children, star_sign,
                  last_active FROM Users WHERE id = ?`
-            ).bind(userId).first();
+        ).bind(userId).first();
 
-            if (!row) throw new NotFoundError('User');
+        if (!row) throw new NotFoundError('User');
 
-            const responseBody = JSON.stringify({ success: true, data: row });
+        const responseBody = JSON.stringify({ success: true, data: row });
 
-            // Cache for 5 minutes
-            if (env.GEO_KV) {
-                await env.GEO_KV.put(cacheKey, responseBody, { expirationTtl: 300 });
-            }
-
-            return new Response(responseBody, {
-                headers: { 'Content-Type': 'application/json', 'X-Cache': 'MISS' }
-            });
+        // Cache for 5 minutes
+        if (env.GEO_KV) {
+            await env.GEO_KV.put(cacheKey, responseBody, { expirationTtl: 300 });
         }
 
-        // --- LOCATION PING ---
-        if (url.pathname === '/user/ping' && request.method === 'POST') {
-            const body = LocationPingSchema.parse(await request.json());
-            const { lat, long } = body;
+        return new Response(responseBody, {
+            headers: { 'Content-Type': 'application/json', 'X-Cache': 'MISS' }
+        });
+    }
 
-            const s2CellId = latLonToCellId(lat, long);
-            const timestamp = Math.floor(Date.now() / 1000);
+    // --- LOCATION PING ---
+    if (url.pathname === '/user/ping' && request.method === 'POST') {
+        const body = LocationPingSchema.parse(await request.json());
+        const { lat, long } = body;
 
-            await env.DB.prepare(
-                "UPDATE Users SET lat = ?, long = ?, s2_cell_id = ?, last_active = ? WHERE id = ?"
-            ).bind(lat, long, s2CellId, timestamp, userId).run();
+        const s2CellId = latLonToCellId(lat, long);
+        const timestamp = Math.floor(Date.now() / 1000);
 
-            // KV Update for fast proximity lookups
-            if (env.GEO_KV) {
-                await env.GEO_KV.put(`user_loc:${userId}`, s2CellId, { expirationTtl: 86400 });
-            }
+        await env.DB.prepare(
+            "UPDATE Users SET lat = ?, long = ?, s2_cell_id = ?, last_active = ? WHERE id = ?"
+        ).bind(lat, long, s2CellId, timestamp, userId).run();
 
-            return new Response(JSON.stringify({ success: true, cell_id: s2CellId }), {
-                headers: { 'Content-Type': 'application/json' }
-            });
+        // KV Update for fast proximity lookups
+        if (env.GEO_KV) {
+            await env.GEO_KV.put(`user_loc:${userId}`, s2CellId, { expirationTtl: 86400 });
         }
 
-        // --- PROFILE UPDATE ---
-        if (url.pathname === '/user/profile' && request.method === 'PUT') {
-            const body = ProfileUpdateSchema.parse(await request.json());
+        return new Response(JSON.stringify({ success: true, cell_id: s2CellId }), {
+            headers: { 'Content-Type': 'application/json' }
+        });
+    }
 
-            const updates = [];
-            const values = [];
+    // --- PROFILE UPDATE ---
+    if (url.pathname === '/user/profile' && request.method === 'PUT') {
+        const body = ProfileUpdateSchema.parse(await request.json());
 
-            for (const [field, value] of Object.entries(body)) {
-                updates.push(`${field} = ?`);
-                values.push(Array.isArray(value) ? JSON.stringify(value) : value);
-            }
+        const updates = [];
+        const values = [];
 
-            if (updates.length === 0) {
-                throw new ValidationError('No valid fields provided');
-            }
-
-            values.push(userId);
-            await env.DB.prepare(`UPDATE Users SET ${updates.join(', ')} WHERE id = ?`).bind(...values).run();
-
-            // Invalidate KV Cache
-            if (env.GEO_KV) {
-                await env.GEO_KV.delete(`user_profile:${userId}`);
-            }
-
-            return new Response(JSON.stringify({ success: true, message: 'Profile updated' }), {
-                headers: { 'Content-Type': 'application/json' }
-            });
+        for (const [field, value] of Object.entries(body)) {
+            updates.push(`${field} = ?`);
+            values.push(Array.isArray(value) ? JSON.stringify(value) : value);
         }
 
-        // --- DISCOVERY PREFERENCES ---
-        if (url.pathname === '/user/preferences' && request.method === 'POST') {
-            const body = UserPreferencesSchema.parse(await request.json());
+        if (updates.length === 0) {
+            throw new ValidationError('No valid fields provided');
+        }
 
-            const updates = [];
-            const values = [];
+        values.push(userId);
+        await env.DB.prepare(`UPDATE Users SET ${updates.join(', ')} WHERE id = ?`).bind(...values).run();
 
-            for (const [pref, value] of Object.entries(body)) {
-                updates.push(`${pref} = ?`);
-                values.push(typeof value === 'object' ? JSON.stringify(value) : value);
-            }
+        // Invalidate KV Cache
+        if (env.GEO_KV) {
+            await env.GEO_KV.delete(`user_profile:${userId}`);
+        }
 
-            if (updates.length === 0) {
-                throw new ValidationError('No valid preferences provided');
-            }
+        return new Response(JSON.stringify({ success: true, message: 'Profile updated' }), {
+            headers: { 'Content-Type': 'application/json' }
+        });
+    }
 
-            // UPSERT for UserPreferences
-            const columnNames = updates.map(u => u.split(' = ')[0]);
-            const placeholders = updates.map(() => '?');
-            const updateClause = updates.join(', ');
+    // --- DISCOVERY PREFERENCES ---
+    if (url.pathname === '/user/preferences' && request.method === 'POST') {
+        const body = UserPreferencesSchema.parse(await request.json());
 
-            const query = `
+        const updates = [];
+        const values = [];
+
+        for (const [pref, value] of Object.entries(body)) {
+            updates.push(`${pref} = ?`);
+            values.push(typeof value === 'object' ? JSON.stringify(value) : value);
+        }
+
+        if (updates.length === 0) {
+            throw new ValidationError('No valid preferences provided');
+        }
+
+        // UPSERT for UserPreferences
+        const columnNames = updates.map(u => u.split(' = ')[0]);
+        const placeholders = updates.map(() => '?');
+        const updateClause = updates.join(', ');
+
+        const query = `
                 INSERT INTO UserPreferences (user_id, ${columnNames.join(', ')})
                 VALUES (?, ${placeholders.join(', ')})
                 ON CONFLICT(user_id) DO UPDATE SET ${updateClause}
             `;
 
-            await env.DB.prepare(query).bind(userId, ...values, ...values).run();
+        await env.DB.prepare(query).bind(userId, ...values, ...values).run();
 
-            return new Response(JSON.stringify({ success: true, message: 'Preferences updated' }), {
-                headers: jsonHeaders
-            });
-        }
-
-    } catch (err: any) {
-        // Errors are caught by the global handler in index.ts
-        throw err;
+        return new Response(JSON.stringify({ success: true, message: 'Preferences updated' }), {
+            headers: jsonHeaders
+        });
     }
+
+
 
     return new Response(JSON.stringify({ error: 'Route not found' }), {
         status: 404,

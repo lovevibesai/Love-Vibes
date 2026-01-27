@@ -3,7 +3,7 @@
 
 import { Env } from './index'
 import { z } from 'zod';
-import { AuthenticationError, ValidationError, NotFoundError, AppError } from './errors';
+import { AuthenticationError, NotFoundError, AppError } from './errors';
 import { logger } from './logger';
 
 // Zod Schema
@@ -32,9 +32,9 @@ export interface ModerationReport {
 // AI Content Moderation Helper
 export async function autoModerateContent(env: Env, text: string): Promise<{ toxic: boolean; score: number }> {
     try {
-        const result: any = await env.AI.run('@cf/microsoft/distilbert-base-uncased-mnli', {
+        const result = await env.AI.run('@cf/microsoft/distilbert-base-uncased-mnli' as unknown as Parameters<Ai['run']>[0], {
             text: text
-        });
+        }) as { label: string; score: number };
 
         const toxicScore = result.label === 'LABEL_1' ? result.score : 0;
 
@@ -42,7 +42,7 @@ export async function autoModerateContent(env: Env, text: string): Promise<{ tox
             toxic: toxicScore > 0.85,
             score: toxicScore
         };
-    } catch (e) {
+    } catch (_e) {
         return { toxic: false, score: 0 };
     }
 }
@@ -127,14 +127,14 @@ export async function reviewReport(
 
         logger.info('report_reviewed', undefined, { adminId, reportId, action });
         return { success: true, message: 'Report reviewed successfully' }
-    } catch (error: any) {
+    } catch (error: unknown) {
         if (error instanceof AppError) throw error;
-        throw new AppError('Report review failed', 500, 'REVIEW_FAILED', error);
+        throw new AppError('Report review failed', 500, 'REVIEW_FAILED', error instanceof Error ? error : undefined);
     }
 }
 
 // GET /admin/moderation/stats - Get moderation statistics
-export async function getModerationStats(env: Env, adminId: string): Promise<any> {
+export async function getModerationStats(env: Env, adminId: string): Promise<Record<string, unknown> | null> {
     const admin = await env.DB.prepare('SELECT id FROM Users WHERE id = ? AND subscription_tier = ?')
         .bind(adminId, 'admin')
         .first()

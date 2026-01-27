@@ -5,7 +5,7 @@
 import { Env } from './index';
 import { verifyAuth } from './auth';
 import { z } from 'zod';
-import { ValidationError, AuthenticationError, AppError } from './errors';
+import { ValidationError, AuthenticationError } from './errors';
 import { notifyNewMatch } from './notifications';
 
 const SwipeSchema = z.object({
@@ -32,7 +32,7 @@ export async function handleSwipe(request: Request, env: Env): Promise<Response>
         "INSERT OR REPLACE INTO Swipes (actor_id, target_id, type, timestamp) VALUES (?, ?, ?, ?)"
     ).bind(userId, targetId, type, timestamp).run();
 
-    let matchData = null;
+    let matchData: { match_id: string; is_match: boolean; chat_room_id: string } | null = null;
 
     // 2. If LIKE, check for Mutual Match
     if (type === 'LIKE') {

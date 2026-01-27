@@ -42,9 +42,9 @@ export async function handleReportUser(request: Request, env: Env): Promise<Resp
             headers: jsonHeaders
         });
 
-    } catch (e: any) {
+    } catch (e: unknown) {
         if (e instanceof z.ZodError) throw new ValidationError(e.errors[0].message);
-        throw new AppError('Report failed', 500, 'REPORT_ERROR', e);
+        throw new AppError('Report failed', 500, 'REPORT_ERROR', e instanceof Error ? e : undefined);
     }
 }
 
@@ -68,8 +68,8 @@ export async function handleBlockUser(request: Request, env: Env): Promise<Respo
         return new Response(JSON.stringify({ success: true, data: { message: 'User blocked' } }), {
             headers: jsonHeaders
         });
-    } catch (e: any) {
+    } catch (e: unknown) {
         if (e instanceof z.ZodError) throw new ValidationError(e.errors[0].message);
-        throw new AppError('Block failed', 500, 'BLOCK_ERROR', e);
+        throw new AppError('Block failed', 500, 'BLOCK_ERROR', e instanceof Error ? e : undefined);
     }
 }

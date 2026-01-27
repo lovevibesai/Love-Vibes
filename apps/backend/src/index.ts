@@ -26,7 +26,7 @@ import { handleRecovery } from './recovery';
 import { handleModeration } from './moderation';
 import { handleAdminMetrics } from './admin';
 import { logger } from './logger';
-import { handleApiError, AppError, ServerError, ValidationError } from './errors';
+import { handleApiError, AppError, ValidationError } from './errors';
 
 export { ChatRoom, MatchLobby } from './durable_objects';
 
@@ -37,7 +37,7 @@ export interface Env {
     CHAT_ROOM: DurableObjectNamespace;
     MATCH_LOBBY: DurableObjectNamespace;
     LV_AI: AnalyticsEngineDataset;
-    AI: any; // Cloudflare Workers AI
+    AI: Ai; // Cloudflare Workers AI
     CLOUDFLARE_ACCOUNT_ID?: string;
     CLOUDFLARE_API_TOKEN?: string;
     JWT_SECRET?: string;
@@ -49,7 +49,7 @@ export interface Env {
  * Structured Analytics Helper
  * Maps JSON data to Analytics Engine blobs/doubles for cost efficiency
  */
-export function trackEvent(env: Env, eventName: string, data: Record<string, any>) {
+export function trackEvent(env: Env, eventName: string, data: Record<string, unknown>) {
     try {
         const blobs: string[] = [eventName]; // index 0 is always event name
         const doubles: number[] = [];
@@ -58,20 +58,21 @@ export function trackEvent(env: Env, eventName: string, data: Record<string, any
         // blobs: [event_name, user_id, device_type]
         // doubles: [timestamp, value/amount]
 
-        if (data.userId) blobs.push(data.userId);
-        if (data.type) blobs.push(data.type);
+        if (data.userId) blobs.push(String(data.userId));
+        if (data.type) blobs.push(String(data.type));
 
         doubles.push(Date.now());
-        if (data.amount) doubles.push(data.amount);
+        if (typeof data.amount === 'number') doubles.push(data.amount);
 
-        void (env.LV_AI as any).writeData({ blobs, doubles });
+        // Use type assertion to avoid missing property error in some worker-types versions
+        (env.LV_AI as any).writeData({ blobs, doubles });
     } catch (e) {
         console.error("Analytics Error:", e);
     }
 }
 
 export default {
-    async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+    async fetch(request: Request, env: Env, _ctx: ExecutionContext): Promise<Response> {
         const url = new URL(request.url);
         const startTime = Date.now();
         const requestId = crypto.randomUUID();
@@ -114,7 +115,7 @@ export default {
             });
 
             return newResponse;
-        } catch (e: any) {
+        } catch (e: unknown) {
             const duration = Date.now() - startTime;
             logger.error('request_error', e, {
                 requestId,
@@ -164,7 +165,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         if (env.DB) {
             try {
                 await env.DB.prepare('SELECT 1').first();
-            } catch (e) {
+            } catch (_e) {
                 dbRead = 'error';
             }
 
@@ -173,7 +174,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
                 await env.DB.prepare(
                     'INSERT OR REPLACE INTO HealthCheck (id, timestamp) VALUES (1, ?)'
                 ).bind(Date.now()).run();
-            } catch (e) {
+            } catch (_e) {
                 dbWrite = 'error';
             }
         } else {
@@ -190,8 +191,8 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
                 headers: { 'User-Agent': 'LoveVibes/1.0 HealthCheck' }
             });
             googleAuth = googleRes.ok || googleRes.status === 400 ? 'ok' : 'error';
-        } catch (e) {
-            console.error('Health Check External Error:', e);
+        } catch (_e) {
+            console.error('Health Check External Error:', _e);
             googleAuth = 'error';
         }
 
@@ -288,7 +289,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         });
     }
     if (path === '/v2/user/prompts' && method === 'POST') {
-        const body = await request.json() as any;
+        const body = await request.json() as { user_id: string; prompts: any[] };
         const result = await saveUserPrompts(env, body.user_id, body.prompts);
         return new Response(JSON.stringify({ success: true, data: result }), {
             headers: jsonHeaders
@@ -314,10 +315,10 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         });
     }
     if (path === '/v2/referrals/unlock' && method === 'POST') {
-        const body = await request.json() as any; // { userId, scenarioType }
+        const body = await request.json() as { userId: string; scenarioType: string };
         if (!body.userId || !body.scenarioType) throw new ValidationError('Missing userId or scenarioType');
 
-        const result = await unlockScenario(env, body.userId, body.scenarioType);
+        const result = await unlockScenario(env, body.userId, body.scenarioType as "intimate" | "mystical");
         return new Response(JSON.stringify({ success: true, data: result }), {
             headers: jsonHeaders
         });

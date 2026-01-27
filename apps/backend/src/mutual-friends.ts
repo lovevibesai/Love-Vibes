@@ -58,8 +58,8 @@ export async function importContacts(
 
         logger.info('contacts_imported', undefined, { userId, count: imported });
         return { success: true, imported_count: imported }
-    } catch (error: any) {
-        throw new AppError('Failed to import contacts', 500, 'CONTACT_IMPORT_FAILED', error);
+    } catch (error: unknown) {
+        throw new AppError('Failed to import contacts', 500, 'CONTACT_IMPORT_FAILED', error instanceof Error ? error : undefined);
     }
 }
 
@@ -87,10 +87,10 @@ export async function findMutualFriends(
         .bind(userId, targetId, userId, targetId)
         .all()
 
-    return results.results.map((r: any) => ({
-        friend_id: r.id,
-        friend_name: r.name,
-        connection_type: r.connection_type,
+    return (results.results || []).map((r: Record<string, unknown>) => ({
+        friend_id: String(r.id),
+        friend_name: String(r.name),
+        connection_type: String(r.connection_type),
     }))
 }
 
@@ -128,9 +128,9 @@ export async function requestIntroduction(
         // Send notification to mutual friend
         logger.info('intro_requested', undefined, { requesterId, targetId, mutualFriendId });
         return { success: true, message: 'Introduction request sent!' }
-    } catch (error: any) {
+    } catch (error: unknown) {
         if (error instanceof AppError) throw error;
-        throw new AppError('Failed to send intro request', 500, 'INTRO_REQUEST_FAILED', error);
+        throw new AppError('Failed to send intro request', 500, 'INTRO_REQUEST_FAILED', error instanceof Error ? error : undefined);
     }
 }
 
@@ -178,9 +178,9 @@ export async function respondToIntroduction(
 
         logger.info('intro_declined', undefined, { friendId, requestId });
         return { success: true, match_created: false }
-    } catch (error: any) {
+    } catch (error: unknown) {
         if (error instanceof AppError) throw error;
-        throw new AppError('Failed to respond to intro', 500, 'INTRO_RESPONSE_FAILED', error);
+        throw new AppError('Failed to respond to intro', 500, 'INTRO_RESPONSE_FAILED', error instanceof Error ? error : undefined);
     }
 }
 

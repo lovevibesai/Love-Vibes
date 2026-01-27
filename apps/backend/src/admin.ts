@@ -5,7 +5,7 @@ import { Env } from './index';
 import { logger } from './logger';
 
 export async function handleAdminMetrics(request: Request, env: Env): Promise<Response> {
-    const url = new URL(request.url);
+    const _url = new URL(request.url);
     const jsonHeaders = { 'Content-Type': 'application/json' };
 
     // Basic Admin Check (In production, replace with more robust RBAC)
@@ -35,14 +35,14 @@ export async function handleAdminMetrics(request: Request, env: Env): Promise<Re
         let errorCount = 0;
         try {
             // This assumes the user has set up the dataset with proper index/blob mappings
-            const errorResults = await env.LV_AI.writeDataPoint({
+            const _errorResults = await env.LV_AI.writeDataPoint({
                 blobs: ['error_check'],
                 doubles: [1]
             });
             // Note: In Workers Analytics Engine, you usually query via SQL in the dashboard
             // But we can return a status or attempt to provide a metric if available
             errorCount = 0; // Placeholder for SQL query result if integrated
-        } catch (e) {
+        } catch (_e) {
             logger.warn('admin_analytics_check_failed', 'Analytics Engine access failed');
         }
 

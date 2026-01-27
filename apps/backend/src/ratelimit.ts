@@ -30,7 +30,6 @@ export async function checkRateLimit(
 
     const now = Math.floor(Date.now() / 1000)
     const windowStart = now - config.windowSeconds
-    const key = `ratelimit:${action}:${userId}`
 
     try {
         // Get current count from D1

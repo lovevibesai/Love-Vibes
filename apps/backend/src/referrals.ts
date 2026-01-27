@@ -2,8 +2,7 @@
 // Track referrals and reward users with Scenario Keys
 
 import { Env } from './index'
-import { z } from 'zod';
-import { ValidationError, AppError, NotFoundError } from './errors';
+import { AppError, NotFoundError } from './errors';
 import { logger } from './logger';
 
 export interface ReferralStats {
@@ -110,15 +109,15 @@ export async function getReferralStats(env: Env, userId: string): Promise<Referr
             total_referrals: (stats.total as number) || 0,
             successful_signups: (stats.successful as number) || 0,
             available_keys: (user.scenario_keys as number) || 0,
-            referrals: referralsList.map((r: any) => ({
-                name: r.name,
-                joined_at: r.created_at,
-                status: r.status,
+            referrals: (referralsList as Record<string, unknown>[]).map((r) => ({
+                name: String(r.name),
+                joined_at: Number(r.created_at),
+                status: r.status as 'signed_up' | 'active' | 'premium',
             })),
         }
-    } catch (error: any) {
+    } catch (error: unknown) {
         if (error instanceof AppError) throw error;
-        throw new AppError('Failed to fetch referral stats', 500, 'REFERRAL_STATS_ERROR', error);
+        throw new AppError('Failed to fetch referral stats', 500, 'REFERRAL_STATS_ERROR', error instanceof Error ? error : undefined);
     }
 }
 

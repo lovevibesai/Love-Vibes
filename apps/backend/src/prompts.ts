@@ -38,8 +38,8 @@ export async function getPrompts(env: Env): Promise<ProfilePrompt[]> {
         ).all()
 
         return results.results as unknown as ProfilePrompt[]
-    } catch (e: any) {
-        throw new AppError('Failed to fetch prompts', 500, 'FETCH_PROMPTS_ERROR', e);
+    } catch (e: unknown) {
+        throw new AppError('Failed to fetch prompts', 500, 'FETCH_PROMPTS_ERROR', e instanceof Error ? e : undefined);
     }
 }
 
@@ -47,7 +47,7 @@ export async function getPrompts(env: Env): Promise<ProfilePrompt[]> {
 export async function saveUserPrompts(
     env: Env,
     userId: string,
-    promptsRaw: any
+    promptsRaw: unknown
 ): Promise<{ success: boolean; message: string }> {
     try {
         const prompts = SavePromptsSchema.parse(promptsRaw);
@@ -94,8 +94,8 @@ export async function getUserPrompts(env: Env, userId: string): Promise<UserProm
             .bind(userId)
             .all()
 
-        return results.results as any[]
-    } catch (e: any) {
-        throw new AppError('Failed to fetch user prompts', 500, 'FETCH_USER_PROMPTS_ERROR', e);
+        return results.results as unknown as UserPromptResponse[]
+    } catch (e: unknown) {
+        throw new AppError('Failed to fetch user prompts', 500, 'FETCH_USER_PROMPTS_ERROR', e instanceof Error ? e : undefined);
     }
 }

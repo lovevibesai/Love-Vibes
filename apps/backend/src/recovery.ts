@@ -3,7 +3,7 @@
 
 import { Env } from './index'
 import { z } from 'zod';
-import { ValidationError, AppError, NotFoundError } from './errors';
+import { AppError } from './errors';
 import { logger } from './logger';
 
 // Zod Schemas
@@ -85,14 +85,14 @@ export async function verifyPassword(password: string, storedHash: string): Prom
             result |= computedArray[i] ^ expectedHash[i];
         }
         return result === 0;
-    } catch (e) {
+    } catch (_e) {
         return false;
     }
 }
 
 // Send password reset email via Resend
 async function sendPasswordResetEmail(env: Env, email: string, resetToken: string): Promise<boolean> {
-    const apiKey = (env as any).RESEND_API_KEY;
+    const apiKey = env.RESEND_API_KEY;
 
     if (!apiKey) {
         logger.warn('password_reset_email_skipped', 'RESEND_API_KEY not configured', { email });
@@ -129,7 +129,7 @@ async function sendPasswordResetEmail(env: Env, email: string, resetToken: strin
             })
         });
 
-        const result: any = await response.json();
+        const result = await response.json() as { id: string };
 
         if (!response.ok) {
             logger.error('password_reset_email_failed', result, { email });
@@ -138,8 +138,8 @@ async function sendPasswordResetEmail(env: Env, email: string, resetToken: strin
 
         logger.info('password_reset_email_sent', undefined, { email, messageId: result.id });
         return true;
-    } catch (e) {
-        logger.error('password_reset_email_error', e, { email });
+    } catch (e: unknown) {
+        logger.error('password_reset_email_error', e instanceof Error ? e : undefined, { email });
         return false;
     }
 }
@@ -176,8 +176,8 @@ export async function requestPasswordReset(env: Env, email: string): Promise<{ s
         await sendPasswordResetEmail(env, email, resetToken);
 
         return { success: true, message: 'If an account exists, a reset link has been sent' }
-    } catch (error: any) {
-        throw new AppError('Password reset request failed', 500, 'RESET_REQUEST_FAILED', error);
+    } catch (error: unknown) {
+        throw new AppError('Password reset request failed', 500, 'RESET_REQUEST_FAILED', error instanceof Error ? error : undefined);
     }
 }
 
@@ -215,9 +215,9 @@ export async function resetPassword(
 
         logger.info('password_reset_success', undefined, { userId: resetRecord.user_id });
         return { success: true, message: 'Password reset successfully' }
-    } catch (error: any) {
+    } catch (error: unknown) {
         if (error instanceof AppError) throw error;
-        throw new AppError('Failed to reset password', 500, 'RESET_FAILED', error);
+        throw new AppError('Failed to reset password', 500, 'RESET_FAILED', error instanceof Error ? error : undefined);
     }
 }
 
@@ -242,7 +242,7 @@ export async function handleRecovery(request: Request, env: Env): Promise<Respon
             const result = await resetPassword(env, body.token, body.new_password);
             return new Response(JSON.stringify(result), { headers: jsonHeaders });
         }
-    } catch (e: any) {
+    } catch (e: unknown) {
         if (e instanceof z.ZodError) {
             throw new AppError(e.errors[0].message, 400, 'VALIDATION_ERROR');
         }

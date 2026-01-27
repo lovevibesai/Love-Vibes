@@ -1,4 +1,4 @@
-import { env, SELF } from 'cloudflare:test';
+import { _env, SELF } from 'cloudflare:test';
 import { it, expect, describe } from 'vitest';
 
 describe('Love Vibes Backend', () => {

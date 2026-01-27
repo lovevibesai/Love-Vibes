@@ -5,7 +5,7 @@
 import { Env } from './index';
 import { verifyAuth } from './auth';
 import { z } from 'zod';
-import { ValidationError, AuthenticationError, AppError } from './errors';
+import { AuthenticationError, AppError } from './errors';
 import { logger } from './logger';
 
 // Zod Schema
@@ -42,7 +42,7 @@ export async function handleGifting(request: Request, env: Env): Promise<Respons
         "SELECT credits_balance FROM Users WHERE id = ?"
     ).bind(userId).all();
 
-    const user: any = results[0];
+    const user = results[0] as { credits_balance: number } | undefined;
 
     if (!user || user.credits_balance < giftCost) {
         throw new AppError("Insufficient credits", 402, 'INSUFFICIENT_CREDITS', {
@@ -63,7 +63,7 @@ export async function handleGifting(request: Request, env: Env): Promise<Respons
             ).bind(giftId, userId, recipient_id, gift_item_id, message, 'SENT', timestamp)
         ]);
 
-        const remainingCredits = user.credits_balance - giftCost;
+        const remainingCredits = (user?.credits_balance || 0) - giftCost;
         logger.info('gift_sent', undefined, { userId, recipientId: recipient_id, giftItemId: gift_item_id, cost: giftCost });
 
         return new Response(JSON.stringify({
@@ -74,7 +74,7 @@ export async function handleGifting(request: Request, env: Env): Promise<Respons
             }
         }), { headers: { 'Content-Type': 'application/json' } });
 
-    } catch (e: any) {
-        throw new AppError('Gifting failed', 500, 'GIFT_ERROR', e);
+    } catch (e: unknown) {
+        throw new AppError('Gifting failed', 500, 'GIFT_ERROR', e instanceof Error ? e : undefined);
     }
 }

@@ -3,7 +3,7 @@
 
 import { Env } from './index'
 import { z } from 'zod';
-import { AuthenticationError, ValidationError, AppError, NotFoundError } from './errors';
+import { AuthenticationError, ValidationError, AppError } from './errors';
 import { logger } from './logger';
 import { verifyAuth } from './auth';
 
@@ -37,7 +37,7 @@ const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 
 export async function setVibeWindows(
     env: Env,
     userId: string,
-    windowsRaw: any
+    windowsRaw: unknown
 ): Promise<{ success: boolean; message: string }> {
     try {
         const { windows } = SetVibeWindowsSchema.parse(windowsRaw);
@@ -55,9 +55,9 @@ export async function setVibeWindows(
 
         logger.info('vibe_windows_updated', undefined, { userId, count: windows.length });
         return { success: true, message: 'Vibe windows updated!' }
-    } catch (error: any) {
+    } catch (error: unknown) {
         if (error instanceof z.ZodError) throw new ValidationError(error.errors[0].message);
-        throw new AppError('Failed to set vibe windows', 500, 'VIBE_UPDATE_FAILED', error);
+        throw new AppError('Failed to set vibe windows', 500, 'VIBE_UPDATE_FAILED', error instanceof Error ? error : undefined);
     }
 }
 
@@ -74,10 +74,10 @@ export async function getVibeWindowStatus(env: Env, userId: string): Promise<Act
         return { is_in_window: false, users_online_now: 0 }
     }
 
-    const currentWindow = windows.results.find((w: any) => {
+    const currentWindow = windows.results.find((w: Record<string, unknown>) => {
         if (w.day_of_week !== currentDay) return false
-        const windowEnd = w.start_hour + Math.floor(w.duration_minutes / 60)
-        return currentHour >= w.start_hour && currentHour < windowEnd
+        const windowEnd = Number(w.start_hour) + Math.floor(Number(w.duration_minutes) / 60)
+        return currentHour >= Number(w.start_hour) && currentHour < windowEnd
     })
 
     if (currentWindow) {
@@ -152,7 +152,7 @@ export async function handleVibeWindows(request: Request, env: Env): Promise<Res
             const result = await getVibeWindowStatus(env, userId);
             return new Response(JSON.stringify({ success: true, data: result }), { headers: jsonHeaders });
         }
-    } catch (e: any) {
+    } catch (e: unknown) {
         if (e instanceof z.ZodError) throw new ValidationError(e.errors[0].message);
         throw e;
     }

@@ -19,7 +19,7 @@ export async function handleMedia(request: Request, env: Env): Promise<Response>
 
         try {
             key = decodeURIComponent(key);
-        } catch (e) {
+        } catch (_e) {
             logger.error('media_decode_error', 'Failed to decode key', { key });
         }
 
@@ -42,8 +42,8 @@ export async function handleMedia(request: Request, env: Env): Promise<Response>
 
     // 1. Get Direct Upload URL for Cloudflare Stream
     if (method === 'GET' && pathMatches(path, '/v2/media/video-upload-url')) {
-        const accountId = (env as any).CLOUDFLARE_ACCOUNT_ID;
-        const apiToken = (env as any).CLOUDFLARE_API_TOKEN;
+        const accountId = env.CLOUDFLARE_ACCOUNT_ID;
+        const apiToken = env.CLOUDFLARE_API_TOKEN;
 
         if (!accountId || !apiToken) {
             throw new ServerError("Media processing service not configured");
@@ -64,7 +64,7 @@ export async function handleMedia(request: Request, env: Env): Promise<Response>
             }
         );
 
-        const data: any = await streamResponse.json();
+        const data = await streamResponse.json() as { result: { uploadURL: string, uid: string } };
         return new Response(JSON.stringify({
             success: true,
             data: {
@@ -88,7 +88,7 @@ export async function handleMedia(request: Request, env: Env): Promise<Response>
 
         const key = `users/${userId}/${type}s/${fileId}.${extension}`;
 
-        await env.MEDIA_BUCKET.put(key, file.stream() as any, {
+        await env.MEDIA_BUCKET.put(key, file.stream(), {
             httpMetadata: { contentType: file.type }
         });
 
@@ -97,9 +97,9 @@ export async function handleMedia(request: Request, env: Env): Promise<Response>
 
         // 3. Real AI Moderation (Classification check)
         try {
-            const aiResult: any = await env.AI.run('@cf/microsoft/resnet-50', {
+            const aiResult = await env.AI.run('@cf/microsoft/resnet-50', {
                 image: Array.from(new Uint8Array(await file.arrayBuffer()))
-            });
+            }) as Array<{ label: string, score: number }>;
             // ResNet-50 returns labels like 'person', 'clothing', etc.
             // We can log this for human moderation or automatically flag suspicious uploads.
             logger.info('media_ai_moderated', undefined, { userId, type, key, labels: aiResult.slice(0, 3) });
@@ -109,20 +109,22 @@ export async function handleMedia(request: Request, env: Env): Promise<Response>
 
         if (type === 'video') {
             const streamUid = formData.get('stream_uid');
-            const videoUrl = streamUid ? `https://customer-${(env as any).CLOUDFLARE_ACCOUNT_ID}.cloudflarestream.com/${streamUid}/watch` : publicUrl;
+            const videoUrl = streamUid ? `https://customer-${env.CLOUDFLARE_ACCOUNT_ID}.cloudflarestream.com/${streamUid}/watch` : publicUrl;
 
             await env.DB.prepare(
                 "UPDATE Users SET video_intro_url = ? WHERE id = ?"
             ).bind(videoUrl, userId).run();
         } else {
-            const { results }: any = await env.DB.prepare(
+            const { results } = await env.DB.prepare(
                 "SELECT photo_urls FROM Users WHERE id = ?"
-            ).bind(userId).all();
+            ).bind(userId).all() as { results: Array<{ photo_urls: string }> };
 
             let photos = [];
             try {
                 photos = JSON.parse(results[0].photo_urls || '[]');
-            } catch (e) { }
+            } catch (e) {
+                logger.error('media_json_parse_error', 'Failed to parse photo urls', { error: e });
+            }
 
             photos.push(publicUrl);
 

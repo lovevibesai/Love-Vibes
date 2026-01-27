@@ -56,8 +56,8 @@ export async function enableProximity(
             success: true,
             message: enabled ? 'Proximity alerts enabled' : 'Proximity alerts disabled',
         }
-    } catch (error: any) {
-        throw new AppError('Failed to enable/disable proximity', 500, 'PROXIMITY_UPDATE_FAILED', error);
+    } catch (error: unknown) {
+        throw new AppError('Failed to enable/disable proximity', 500, 'PROXIMITY_UPDATE_FAILED', error instanceof Error ? error : undefined);
     }
 }
 
@@ -87,8 +87,8 @@ export async function updateLocation(
         }
 
         return { success: true }
-    } catch (error: any) {
-        throw new AppError('Failed to update location', 500, 'LOCATION_UPDATE_FAILED', error);
+    } catch (error: unknown) {
+        throw new AppError('Failed to update location', 500, 'LOCATION_UPDATE_FAILED', error instanceof Error ? error : undefined);
     }
 }
 
@@ -122,7 +122,7 @@ async function findNearbyMatches(
 
     const nearby: Array<{ user_id: string; distance: number; lat: number; long: number }> = []
 
-    for (const match of (matches.results || []) as any[]) {
+    for (const match of (matches.results || []) as Array<{ match_id: string; current_lat: number; current_long: number }>) {
         const distance = calculateDistance(userLat, userLong, match.current_lat, match.current_long)
         if (distance <= 500) {
             nearby.push({
@@ -217,7 +217,7 @@ async function findNearbyVenue(lat: number, long: number): Promise<{
         // Query Overpass API for cafes or restaurants within 500m
         const query = `[out:json];node(around:500,${lat},${long})[amenity~"cafe|restaurant"];out 1;`;
         const response = await fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`);
-        const data: any = await response.json();
+        const data = await response.json() as { elements?: Array<{ tags: Record<string, string>, amenity?: string }> };
 
         if (data.elements && data.elements.length > 0) {
             const venue = data.elements[0];
@@ -227,8 +227,8 @@ async function findNearbyVenue(lat: number, long: number): Promise<{
                 type: venue.tags.amenity || 'social_spot',
             };
         }
-    } catch (e) {
-        logger.error('venue_search_failed', 'Overpass API search failed', { error: e });
+    } catch (e: unknown) {
+        logger.error('venue_search_failed', 'Overpass API search failed', { error: e instanceof Error ? e : undefined });
     }
 
     return {
@@ -252,8 +252,8 @@ export async function respondToProximityAlert(
 
         logger.info('proximity_response', undefined, { alertId, userId, response });
         return { success: true, message: response === 'accepted' ? 'Meetup confirmed!' : 'Declined' }
-    } catch (error: any) {
-        throw new AppError('Failed to respond to proximity alert', 500, 'PROXIMITY_RESPOND_FAILED', error);
+    } catch (error: unknown) {
+        throw new AppError('Failed to respond to proximity alert', 500, 'PROXIMITY_RESPOND_FAILED', error instanceof Error ? error : undefined);
     }
 }
 
@@ -284,7 +284,7 @@ export async function handleProximity(request: Request, env: Env): Promise<Respo
             const result = await respondToProximityAlert(env, body.alert_id, userId, body.response);
             return new Response(JSON.stringify({ success: true, data: result }), { headers: jsonHeaders });
         }
-    } catch (e: any) {
+    } catch (e: unknown) {
         if (e instanceof z.ZodError) throw new ValidationError(e.errors[0].message);
         throw e;
     }

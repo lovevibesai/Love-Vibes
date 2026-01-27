@@ -54,7 +54,6 @@ export async function fetchWithResizing(
             'Content-Type': object.httpMetadata?.contentType || 'image/jpeg',
             'Cache-Control': 'public, max-age=31536000',
         },
-        // @ts-ignore: Cloudflare specific resizing headers
         cf: {
             image: options
         }

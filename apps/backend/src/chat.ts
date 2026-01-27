@@ -26,8 +26,8 @@ export async function handleChatAI(request: Request, env: Env): Promise<Response
                 "SELECT id, name, interests, relationship_goals FROM Users WHERE id IN (?, ?)"
             ).bind(userId, withUserId).all();
 
-            const u1 = (results as any).find((r: any) => r.id === userId);
-            const u2 = (results as any).find((r: any) => r.id === withUserId);
+            const u1 = (results as unknown as Array<{ id: string, name: string, interests?: string, relationship_goals?: string }>).find((r) => r.id === userId);
+            const u2 = (results as unknown as Array<{ id: string, name: string, interests?: string, relationship_goals?: string }>).find((r) => r.id === withUserId);
 
             if (!u1 || !u2) throw new NotFoundError("Users");
 
@@ -38,7 +38,7 @@ export async function handleChatAI(request: Request, env: Env): Promise<Response
 
             const goals1 = JSON.parse(u1.relationship_goals || '[]');
             const goals2 = JSON.parse(u2.relationship_goals || '[]');
-            const sharedGoals = goals1.filter((g: string) => goals2.includes(g));
+            const _sharedGoals = goals1.filter((g: string) => goals2.includes(g));
 
             const prompt = `
                 You are a charming dating assistant for the app "Love Vibes".
@@ -54,9 +54,9 @@ export async function handleChatAI(request: Request, env: Env): Promise<Response
 
             let icebreakers = [];
             try {
-                const aiResponse: any = await env.AI.run('@cf/meta/llama-3.1-8b-instruct', {
+                const aiResponse = await env.AI.run('@cf/meta/llama-3.1-8b-instruct' as unknown as Parameters<Ai['run']>[0], {
                     messages: [{ role: 'user', content: prompt }]
-                });
+                }) as { response?: string };
 
                 const text = aiResponse.response || "";
                 const jsonMatch = text.match(/\[.*\]/s);
@@ -65,8 +65,8 @@ export async function handleChatAI(request: Request, env: Env): Promise<Response
                 } else {
                     icebreakers = [text.split('\n')[0]];
                 }
-            } catch (e: any) {
-                logger.error("AI Icebreaker failed", e, { userId, withUserId });
+            } catch (e: unknown) {
+                logger.error("AI Icebreaker failed", e instanceof Error ? e : undefined, { userId, withUserId });
                 // Fallback to basic logic if AI fails
                 icebreakers = [
                     `Hey! I notice we both love ${sharedInterests[0] || 'exploring'}.`,
@@ -84,9 +84,9 @@ export async function handleChatAI(request: Request, env: Env): Promise<Response
                 }
             }), { headers: jsonHeaders });
         }
-    } catch (e: any) {
+    } catch (e: unknown) {
         if (e instanceof AppError) throw e;
-        throw new AppError('Chat AI operation failed', 500, 'CHAT_AI_ERROR', e);
+        throw new AppError('Chat AI operation failed', 500, 'CHAT_AI_ERROR', e instanceof Error ? e : undefined);
     }
 
     throw new NotFoundError("Chat route");

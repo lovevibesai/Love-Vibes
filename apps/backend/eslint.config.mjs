@@ -13,7 +13,8 @@ export default [
             ecmaVersion: 2022,
             globals: {
                 ...globals.browser,
-                ...globals.node
+                ...globals.node,
+                ...globals.serviceworker
             }
         },
         plugins: {
@@ -25,7 +26,16 @@ export default [
             "no-console": "off",
             "no-undef": "off",
             "no-unused-vars": "off",
-            "@typescript-eslint/no-unused-vars": ["warn", { "argsIgnorePattern": "^_" }]
+            "@typescript-eslint/no-unused-vars": ["error", {
+                "argsIgnorePattern": "^_",
+                "varsIgnorePattern": "^_",
+                "caughtErrorsIgnorePattern": "^_"
+            }],
+            "no-empty": ["error", { "allowEmptyCatch": false }],
+            "@typescript-eslint/ban-ts-comment": ["error", {
+                "ts-expect-error": "allow-with-description",
+                "ts-ignore": true
+            }]
         }
     }
 ];
