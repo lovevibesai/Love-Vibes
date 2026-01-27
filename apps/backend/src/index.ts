@@ -184,9 +184,14 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
         // Check external reachability
         let googleAuth = 'untested';
         try {
-            const googleRes = await fetch('https://oauth2.googleapis.com/tokeninfo', { method: 'HEAD' });
+            // Use GET instead of HEAD, and expect 400 (Bad Request) which means we reached the service
+            const googleRes = await fetch('https://oauth2.googleapis.com/tokeninfo', {
+                method: 'GET',
+                headers: { 'User-Agent': 'LoveVibes/1.0 HealthCheck' }
+            });
             googleAuth = googleRes.ok || googleRes.status === 400 ? 'ok' : 'error';
         } catch (e) {
+            console.error('Health Check External Error:', e);
             googleAuth = 'error';
         }
 
