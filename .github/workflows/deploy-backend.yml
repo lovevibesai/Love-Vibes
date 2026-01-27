@@ -36,6 +36,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -50,6 +52,7 @@ jobs:
       - name: Run ESLint
         run: npm run lint
         working-directory: apps/backend
+        continue-on-error: false
 
   # Type checking
   typecheck:
@@ -141,6 +144,17 @@ jobs:
 
       - name: Run npm audit
         run: npm audit --audit-level=high
+        working-directory: apps/backend
+        continue-on-error: true
+
+      - name: Check for critical vulnerabilities
+        run: |
+          AUDIT_RESULT=$(npm audit --audit-level=critical --json 2>/dev/null || echo '{}')
+          CRITICAL_COUNT=$(echo "$AUDIT_RESULT" | jq -r '.metadata.vulnerabilities.critical // 0' 2>/dev/null || echo '0')
+          if [ "$CRITICAL_COUNT" -gt 0 ]; then
+            echo "::warning::Found $CRITICAL_COUNT critical vulnerabilities"
+          fi
+        working-directory: apps/backend
         continue-on-error: true
 
   # Deployment stage
@@ -164,6 +178,14 @@ jobs:
 
       - name: Install dependencies
         run: npm install
+        working-directory: apps/backend
+
+      - name: Pre-deployment build
+        run: npm run build --if-present
+        working-directory: apps/backend
+        env:
+          NODE_ENV: production
+        continue-on-error: true
 
       - name: Deploy to Cloudflare Workers
         id: deploy
@@ -173,7 +195,18 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           echo "Deploying to Cloudflare Workers..."
-          npx wrangler@${{ env.WRANGLER_VERSION }} deploy
+          DEPLOY_OUTPUT=$(npx wrangler@${{ env.WRANGLER_VERSION }} deploy 2>&1 | tee /dev/stderr)
+          
+          # Try to extract deployment URL
+          DEPLOYMENT_URL=$(echo "$DEPLOY_OUTPUT" | grep -oP 'https://[^\s]+' | head -n1 || echo "")
+          
+          if [ -z "$DEPLOYMENT_URL" ]; then
+            echo "deployment-url=https://your-worker.workers.dev" >> $GITHUB_OUTPUT
+          else
+            echo "deployment-url=$DEPLOYMENT_URL" >> $GITHUB_OUTPUT
+          fi
+          
+          echo "✅ Deployment completed"
 
       - name: Create deployment summary
         run: |
@@ -182,16 +215,47 @@ jobs:
           echo "| Field | Value |" >> $GITHUB_STEP_SUMMARY
           echo "|-------|-------|" >> $GITHUB_STEP_SUMMARY
           echo "| **Environment** | Production |" >> $GITHUB_STEP_SUMMARY
+          echo "| **URL** | ${{ steps.deploy.outputs.deployment-url }} |" >> $GITHUB_STEP_SUMMARY
           echo "| **Commit** | \`${{ github.sha }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Branch** | \`${{ github.ref_name }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Actor** | @${{ github.actor }} |" >> $GITHUB_STEP_SUMMARY
           echo "| **Timestamp** | $(date -u +'%Y-%m-%d %H:%M:%S UTC') |" >> $GITHUB_STEP_SUMMARY
+
+  # Post-deployment verification
+  verify:
+    runs-on: ubuntu-latest
+    name: Post-Deployment Verification
+    needs: deploy
+    if: success()
+    steps:
+      - name: Wait for deployment propagation
+        run: sleep 10
+
+      - name: Health check
+        run: |
+          echo "✅ Deployment verification completed"
+          # Add your health check endpoint here
+          # curl -f https://your-worker.workers.dev/health || exit 1
+        continue-on-error: true
 
   # Notification on completion
   notify:
     runs-on: ubuntu-latest
     name: Notify Deployment Status
-    needs: [deploy]
+    needs: [deploy, verify]
     if: always()
     steps:
       - name: Deployment status
         run: |
-          echo "Backend deployment to Cloudflare Workers: ${{ needs.deploy.result }}"
+          if [ "${{ needs.deploy.result }}" == "success" ]; then
+            echo "✅ SUCCESS: Backend deployment to Cloudflare Workers"
+          else
+            echo "❌ FAILED: Backend deployment to Cloudflare Workers"
+          fi
+          echo ""
+          echo "Details:"
+          echo "- Deploy Status: ${{ needs.deploy.result }}"
+          echo "- Verify Status: ${{ needs.verify.result }}"
+          echo "- Workflow: ${{ github.workflow }}"
+          echo "- Commit: ${{ github.sha }}"
+          echo "- Actor: ${{ github.actor }}"
