@@ -8,7 +8,4 @@ export default defineWorkersConfig({
             },
         },
     },
-    ssr: {
-        noExternal: true, // Inline all dependencies to resolve ESM/CJS interop issues
-    },
 });
