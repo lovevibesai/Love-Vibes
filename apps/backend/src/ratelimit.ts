@@ -11,7 +11,7 @@ interface RateLimitConfig {
 const RATE_LIMITS: Record<string, RateLimitConfig> = {
     'swipe': { maxRequests: 100, windowSeconds: 86400 }, // 100 swipes per day
     'message': { maxRequests: 50, windowSeconds: 86400 }, // 50 messages per day (free tier)
-    'signup': { maxRequests: 3, windowSeconds: 3600 }, // 3 signups per hour per IP
+    'signup': { maxRequests: 10, windowSeconds: 3600 }, // 10 OTP/Signups per hour per IP
     'api': { maxRequests: 100, windowSeconds: 60 }, // 100 API calls per minute
 }
 

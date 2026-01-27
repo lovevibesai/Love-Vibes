@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useApp } from "@/lib/app-context"
 import { motion, AnimatePresence } from "framer-motion"
 import {
@@ -25,14 +25,40 @@ export function PhoneScreen() {
   const isEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
   const isOtpValid = otp.length === 6
 
+  const [resendTimer, setResendTimer] = useState(0)
+
+  // Manage resend cooldown timer
+  useEffect(() => {
+    let timer: NodeJS.Timeout
+    if (resendTimer > 0) {
+      timer = setTimeout(() => setResendTimer(resendTimer - 1), 1000)
+    }
+    return () => clearTimeout(timer)
+  }, [resendTimer])
+
   const handleEmailSubmit = async () => {
     if (isEmailValid) {
       setLoading(true)
       try {
         await loginWithEmail(email)
         setStep("method")
-      } catch (e) {
-        toast.error("Protocol error: Failed to transmit OTP")
+      } catch (e: any) {
+        toast.error(e.message || "Protocol error: Failed to transmit OTP")
+      } finally {
+        setLoading(false)
+      }
+    }
+  }
+
+  const handleResendOtp = async () => {
+    if (isEmailValid && resendTimer === 0) {
+      setLoading(true)
+      try {
+        await loginWithEmail(email)
+        toast.success("New decryption code transmitted.")
+        setResendTimer(60)
+      } catch (e: any) {
+        toast.error(e.message || "Failed to resend code")
       } finally {
         setLoading(false)
       }
@@ -56,6 +82,8 @@ export function PhoneScreen() {
       // Reverting to OTP is the most robust fallback
       toast.error("Biometric link not found. Using secure code instead.")
       setStep("otp")
+      // Trigger first OTP automatically when falling back
+      loginWithEmail(email).catch(console.error)
     } finally {
       setLoading(false)
     }
@@ -66,8 +94,8 @@ export function PhoneScreen() {
       setLoading(true)
       try {
         await verifyEmailOTP(email, otp)
-      } catch (e) {
-        toast.error("Invalid decryption code")
+      } catch (e: any) {
+        toast.error(e.message || "Invalid decryption code")
       } finally {
         setLoading(false)
       }
@@ -250,10 +278,11 @@ export function PhoneScreen() {
                 </div>
 
                 <button
-                  onClick={handleEmailSubmit}
-                  className="text-[10px] font-black text-[#D4AF37] uppercase tracking-[0.3em] opacity-40 hover:opacity-100 transition-opacity"
+                  onClick={handleResendOtp}
+                  disabled={resendTimer > 0 || loading}
+                  className="text-[10px] font-black text-[#D4AF37] uppercase tracking-[0.3em] opacity-40 hover:opacity-100 transition-opacity disabled:opacity-20"
                 >
-                  Send code again
+                  {resendTimer > 0 ? `Wait ${resendTimer}s` : "Send code again"}
                 </button>
               </div>
             </motion.div>

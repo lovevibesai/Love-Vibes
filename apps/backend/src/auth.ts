@@ -690,12 +690,10 @@ export async function verifyAuth(request: Request, env: Env): Promise<string | n
 }
 
 async function sendEmail(to: string, text: string, env: Env) {
-    const apiKey = env.RESEND_API_KEY || env.CLOUDFLARE_API_TOKEN;
+    const apiKey = env.RESEND_API_KEY;
 
     if (!apiKey) {
-        // In production, OTP is only stored in DB - never logged
-        // Fallback: store in temporary table or just fail silently
-        logger.warn('otp_email_skipped', 'RESEND_API_KEY not configured', { email: to });
+        logger.error('otp_email_skipped', 'RESEND_API_KEY is not configured in environment variables', { email: to });
         return;
     }
 
