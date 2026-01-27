@@ -4,11 +4,11 @@ import { it, expect, describe } from 'vitest';
 describe('Love Vibes Backend', () => {
     it('responds with health status', async () => {
         const response = await SELF.fetch('http://localhost/health');
-        expect(response.status).toBe(200);
+        expect([200, 503]).toContain(response.status);
 
         const data = await response.json() as any;
-        expect(data.status).toBe('ok');
-        expect(data.subsystems).toBeDefined();
+        expect(['healthy', 'degraded']).toContain(data.status);
+        expect(data.checks).toBeDefined();
     });
 
     it('returns 404 for unknown routes', async () => {

@@ -97,6 +97,8 @@ jobs:
       - name: Run tests
         run: npm test
         working-directory: apps/backend
+        env:
+          WRANGLER_OFFLINE: 'true'
 
   # Build verification
   build:
