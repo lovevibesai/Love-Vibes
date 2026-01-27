@@ -1,0 +1,31 @@
+name = "lovevibes-test"
+compatibility_date = "2025-01-18"
+compatibility_flags = [ "nodejs_compat" ]
+
+[vars]
+RP_ID = "localhost"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "test-db"
+database_id = "test-db-id"
+
+[[kv_namespaces]]
+binding = "GEO_KV"
+id = "test-kv-id"
+
+[[r2_buckets]]
+binding = "MEDIA_BUCKET"
+bucket_name = "test-bucket"
+
+[[durable_objects.bindings]]
+name = "CHAT_ROOM"
+class_name = "ChatRoom"
+
+[[durable_objects.bindings]]
+name = "MATCH_LOBBY"
+class_name = "MatchLobby"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["ChatRoom", "MatchLobby"]
