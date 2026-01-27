@@ -99,6 +99,7 @@ jobs:
         working-directory: apps/backend
         env:
           WRANGLER_OFFLINE: 'true'
+          WRANGLER_LOG: 'debug'
 
   # Build verification
   build:

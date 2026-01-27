@@ -5,11 +5,11 @@ export default defineWorkersConfig({
         poolOptions: {
             workers: {
                 main: './src/index.ts',
+                remote: false,
                 wrangler: { configPath: './wrangler.toml' },
                 miniflare: {
                     compatibilityDate: '2025-01-18',
                     compatibilityFlags: ['nodejs_compat'],
-                    isolatedStorage: true,
                 },
             },
         },
