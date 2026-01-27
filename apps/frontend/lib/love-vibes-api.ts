@@ -3,14 +3,29 @@
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://lovevibes.thelovevibes-ai.workers.dev'
 
-// Generic API call helper
+// Get auth token from storage
+function getAuthToken(): string | null {
+    if (typeof window !== 'undefined') {
+        return localStorage.getItem('lv_jwt') || null
+    }
+    return null
+}
+
+// Generic API call helper with auth
 async function apiCall<T>(endpoint: string, options?: RequestInit): Promise<T> {
+    const token = getAuthToken()
+    const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        ...options?.headers as Record<string, string>,
+    }
+
+    if (token) {
+        headers['Authorization'] = `Bearer ${token}`
+    }
+
     const response = await fetch(`${API_BASE}${endpoint}`, {
         ...options,
-        headers: {
-            'Content-Type': 'application/json',
-            ...options?.headers,
-        },
+        headers,
     })
 
     if (!response.ok) {
@@ -22,161 +37,175 @@ async function apiCall<T>(endpoint: string, options?: RequestInit): Promise<T> {
 
 // Profile Prompts
 export const promptsAPI = {
-    getPrompts: () => apiCall<any[]>('/api/prompts'),
-    saveResponses: (userId: string, responses: any[]) =>
-        apiCall('/api/prompts/responses', {
+    getPrompts: () => apiCall<any[]>('/v2/prompts'),
+    saveResponses: (responses: any[]) =>
+        apiCall('/v2/prompts/responses', {
             method: 'POST',
-            body: JSON.stringify({ user_id: userId, responses }),
+            body: JSON.stringify({ responses }),
         }),
 }
 
 // Boost System
 export const boostAPI = {
-    activate: (userId: string) =>
-        apiCall('/api/boost/activate', {
+    activate: (durationMinutes: number = 30) =>
+        apiCall('/v2/boost/activate', {
             method: 'POST',
-            body: JSON.stringify({ user_id: userId }),
+            body: JSON.stringify({ duration_minutes: durationMinutes }),
         }),
-    getStatus: (userId: string) => apiCall(`/api/boost/status?user_id=${userId}`),
+    getStatus: () => apiCall('/v2/boost/status'),
 }
 
 // Rewind Feature
 export const rewindAPI = {
-    undo: (userId: string) =>
-        apiCall('/api/rewind', {
+    undo: (isPremium: boolean = false) =>
+        apiCall('/v2/rewind', {
             method: 'POST',
-            body: JSON.stringify({ user_id: userId }),
+            body: JSON.stringify({ is_premium: isPremium }),
         }),
 }
 
 // Success Stories
 export const successStoriesAPI = {
-    getStories: () => apiCall<any[]>('/api/success-stories'),
-    submit: (story: any) =>
-        apiCall('/api/success-stories', {
+    getStories: (limit: number = 20) => apiCall<any[]>(`/v2/success-stories?limit=${limit}`),
+    submit: (partnerId: string, storyText: string, relationshipLength: string) =>
+        apiCall('/v2/success-stories', {
             method: 'POST',
-            body: JSON.stringify(story),
+            body: JSON.stringify({
+                partner_id: partnerId,
+                story_text: storyText,
+                relationship_length: relationshipLength
+            }),
         }),
 }
 
 // Referrals
 export const referralsAPI = {
-    getStats: (userId: string) => apiCall(`/api/referrals/stats?user_id=${userId}`),
-    getReferrals: (userId: string) => apiCall(`/api/referrals?user_id=${userId}`),
+    getStats: () => apiCall('/v2/referrals/stats'),
+    getReferrals: () => apiCall('/v2/referrals'),
 }
 
 // Vibe Windows
 export const vibeWindowsAPI = {
-    set: (userId: string, windows: any[]) =>
-        apiCall('/api/vibe-windows/set', {
+    set: (windows: Array<{ day_of_week: number; start_hour: number }>) =>
+        apiCall('/v2/vibe-windows/set', {
             method: 'POST',
-            body: JSON.stringify({ user_id: userId, windows }),
+            body: JSON.stringify({ windows }),
         }),
-    getActive: () => apiCall('/api/vibe-windows/active'),
+    getStatus: () => apiCall('/v2/vibe-windows/status'),
 }
 
 // Voice Matching
 export const voiceAPI = {
-    upload: (userId: string, audioBlob: Blob) => {
+    upload: (audioBlob: Blob) => {
         const formData = new FormData()
-        formData.append('audio', audioBlob)
-        formData.append('user_id', userId)
+        formData.append('file', audioBlob, 'voice.webm')
 
-        return fetch(`${API_BASE}/api/voice/upload`, {
+        const token = getAuthToken()
+        const headers: Record<string, string> = {}
+        if (token) {
+            headers['Authorization'] = `Bearer ${token}`
+        }
+
+        return fetch(`${API_BASE}/v2/voice/upload`, {
             method: 'POST',
+            headers,
             body: formData,
         }).then(r => r.json())
     },
-    getFeed: (userId: string) => apiCall(`/api/voice/feed?user_id=${userId}`),
-    swipe: (actorId: string, targetId: string, type: 'LIKE' | 'PASS') =>
-        apiCall('/api/voice/swipe', {
+    getFeed: () => apiCall('/v2/voice/feed'),
+    swipe: (targetId: string, action: 'LIKE' | 'PASS') =>
+        apiCall('/v2/voice/swipe', {
             method: 'POST',
-            body: JSON.stringify({ actor_id: actorId, target_id: targetId, type }),
+            body: JSON.stringify({ target_id: targetId, action }),
         }),
 }
 
 // Proximity Alerts
 export const proximityAPI = {
-    enable: (userId: string) =>
-        apiCall('/api/proximity/enable', {
+    enable: (enabled: boolean) =>
+        apiCall('/v2/proximity/enable', {
             method: 'POST',
-            body: JSON.stringify({ user_id: userId }),
+            body: JSON.stringify({ enabled }),
         }),
-    updateLocation: (userId: string, lat: number, long: number) =>
-        apiCall('/api/proximity/update-location', {
+    updateLocation: (lat: number, long: number) =>
+        apiCall('/v2/proximity/update', {
             method: 'POST',
-            body: JSON.stringify({ user_id: userId, lat, long }),
+            body: JSON.stringify({ lat, long }),
         }),
-    getNearby: (userId: string) => apiCall(`/api/proximity/nearby-matches?user_id=${userId}`),
+    respond: (alertId: string, response: 'accepted' | 'declined') =>
+        apiCall('/v2/proximity/respond', {
+            method: 'POST',
+            body: JSON.stringify({ alert_id: alertId, response }),
+        }),
 }
 
 // Mutual Friends
 export const mutualFriendsAPI = {
-    importContacts: (userId: string, contacts: string[]) =>
-        apiCall('/api/social/import-contacts', {
+    importContacts: (phoneNumbers: string[]) =>
+        apiCall('/v2/mutual-friends/import', {
             method: 'POST',
-            body: JSON.stringify({ user_id: userId, contacts }),
+            body: JSON.stringify({ phone_numbers: phoneNumbers }),
         }),
-    getMutualFriends: (userId: string, targetId: string) =>
-        apiCall(`/api/social/mutual-friends?user_id=${userId}&target_id=${targetId}`),
-    requestIntro: (requesterId: string, targetId: string, mutualFriendId: string) =>
-        apiCall('/api/social/request-intro', {
+    getMutualFriends: (targetId: string) =>
+        apiCall(`/v2/mutual-friends/find?target_id=${targetId}`),
+    requestIntro: (targetId: string, mutualFriendId: string, message?: string) =>
+        apiCall('/v2/mutual-friends/request', {
             method: 'POST',
-            body: JSON.stringify({ requester_id: requesterId, target_id: targetId, mutual_friend_id: mutualFriendId }),
+            body: JSON.stringify({ target_id: targetId, mutual_friend_id: mutualFriendId, message }),
+        }),
+    respondToIntro: (requestId: string, action: 'approve' | 'decline') =>
+        apiCall('/v2/mutual-friends/respond', {
+            method: 'POST',
+            body: JSON.stringify({ request_id: requestId, action }),
         }),
 }
 
 // Chemistry Test
 export const chemistryAPI = {
     startTest: (matchId: string) =>
-        apiCall('/api/chemistry/start-test', {
+        apiCall('/v2/chemistry/start', {
             method: 'POST',
             body: JSON.stringify({ match_id: matchId }),
         }),
-    submitData: (testId: string, userId: string, heartRateData: number[]) =>
-        apiCall('/api/chemistry/submit-data', {
+    submitAnswers: (testId: string, answers: Record<string, any>) =>
+        apiCall('/v2/chemistry/submit', {
             method: 'POST',
-            body: JSON.stringify({ test_id: testId, user_id: userId, heart_rate_data: heartRateData }),
+            body: JSON.stringify({ test_id: testId, answers }),
         }),
-    getResults: (testId: string) => apiCall(`/api/chemistry/results?test_id=${testId}`),
+    getResults: (testId: string) => apiCall(`/v2/chemistry/results?test_id=${testId}`),
 }
 
 // Account Recovery
 export const recoveryAPI = {
     requestReset: (email: string) =>
-        apiCall('/api/recovery/request', {
+        apiCall('/v2/recovery/request', {
             method: 'POST',
             body: JSON.stringify({ email }),
         }),
-    verifyToken: (token: string) => apiCall(`/api/recovery/verify?token=${token}`),
     resetPassword: (token: string, newPassword: string) =>
-        apiCall('/api/recovery/reset', {
+        apiCall('/v2/recovery/reset', {
             method: 'POST',
             body: JSON.stringify({ token, new_password: newPassword }),
         }),
 }
 
-// Moderation
+// Moderation (Admin)
 export const moderationAPI = {
-    getReports: () => apiCall<any[]>('/api/moderation/reports'),
-    takeAction: (reportId: string, action: 'dismiss' | 'warn' | 'ban', adminId: string) =>
-        apiCall('/api/moderation/action', {
+    getReports: () => apiCall<any[]>('/v2/admin/moderation/reports'),
+    getStats: () => apiCall('/v2/admin/moderation/stats'),
+    reviewReport: (reportId: string, action: 'DISMISS' | 'BAN_USER' | 'WARN_USER', notes: string = '') =>
+        apiCall('/v2/admin/moderation/review', {
             method: 'POST',
-            body: JSON.stringify({ report_id: reportId, action, admin_id: adminId }),
+            body: JSON.stringify({ report_id: reportId, action, notes }),
         }),
 }
 
 // Push Notifications
 export const notificationsAPI = {
-    subscribe: (userId: string, subscription: PushSubscription) =>
-        apiCall('/api/notifications/subscribe', {
+    subscribe: (subscription: { endpoint: string; keys: { p256dh: string; auth: string } }) =>
+        apiCall('/v2/notifications/subscribe', {
             method: 'POST',
-            body: JSON.stringify({ user_id: userId, subscription }),
-        }),
-    updateSettings: (userId: string, settings: any) =>
-        apiCall('/api/notifications/settings', {
-            method: 'POST',
-            body: JSON.stringify({ user_id: userId, ...settings }),
+            body: JSON.stringify({ subscription }),
         }),
 }
 

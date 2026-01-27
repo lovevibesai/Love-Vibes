@@ -9,9 +9,11 @@ import { ExpandedProfile } from "./expanded-profile"
 import { useApp, type User } from "@/lib/app-context"
 import { cn } from "@/lib/utils"
 import { api } from "@/lib/api-client"
+import { loveVibesAPI } from "@/lib/love-vibes-api"
 import { ProximityAlert } from "../proximity/proximity-alert"
 import { EliteGuidance } from "../ui/elite-guidance"
 import { playSound } from "@/lib/sounds"
+import { toast } from "sonner"
 
 export function FeedScreen() {
   const { mode, setShowMatchModal, setMatchedUser, showMatchModal, matchedUser, setCurrentScreen, loadFeed } = useApp()
@@ -22,13 +24,38 @@ export function FeedScreen() {
   const [showProximityAlert, setShowProximityAlert] = useState(false)
   const [proximityMatch, setProximityMatch] = useState<User | null>(null)
   const [showMap, setShowMap] = useState(false)
+  const [userLocation, setUserLocation] = useState<{ lat: number; long: number } | null>(null)
+  const [isRewinding, setIsRewinding] = useState(false)
 
   useEffect(() => {
+    // Get user's actual location
+    const getLocation = (): Promise<{ lat: number; long: number }> => {
+      return new Promise((resolve) => {
+        if ('geolocation' in navigator) {
+          navigator.geolocation.getCurrentPosition(
+            (position) => {
+              const coords = { lat: position.coords.latitude, long: position.coords.longitude }
+              setUserLocation(coords)
+              resolve(coords)
+            },
+            (error) => {
+              console.warn('Geolocation error:', error.message)
+              // Fallback to default location if user denies or error
+              resolve({ lat: 37.7749, long: -122.4194 })
+            },
+            { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 }
+          )
+        } else {
+          resolve({ lat: 37.7749, long: -122.4194 })
+        }
+      })
+    }
+
     const fetchFeed = async () => {
       setLoading(true)
       try {
-        // In a real app, we'd get actual coords. For now, using default SF coords.
-        const results = await loadFeed(37.7749, -122.4194)
+        const location = userLocation || await getLocation()
+        const results = await loadFeed(location.lat, location.long)
         if (results && results.length > 0) {
           // Transform backend schema to frontend User type if needed
           const mappedResults = results.map((u: any) => ({
@@ -39,7 +66,7 @@ export function FeedScreen() {
           }))
           setCards(mappedResults)
         } else {
-          setCards([]) // Production: Show empty state if no recs
+          setCards([])
         }
       } catch (e) {
         console.error("Feed fetch error:", e)
@@ -49,7 +76,7 @@ export function FeedScreen() {
       }
     }
     fetchFeed()
-  }, [mode, loadFeed])
+  }, [mode, loadFeed, userLocation])
 
   const visibleCards = cards.filter((c) => !swipedCards.includes(c.id))
   const isEmpty = visibleCards.length === 0 && !loading
@@ -209,12 +236,31 @@ export function FeedScreen() {
 
           {/* Rewind Button */}
           <button
-            onClick={() => {
-              if (swipedCards.length > 0) {
-                setSwipedCards(prev => prev.slice(0, -1))
+            onClick={async () => {
+              if (swipedCards.length > 0 && !isRewinding) {
+                setIsRewinding(true)
+                try {
+                  // Call backend rewind API
+                  const result = await loveVibesAPI.rewind.undo(false) as { success?: boolean; profile?: any }
+                  if (result.success && result.profile) {
+                    // Remove from swiped cards to show the profile again
+                    setSwipedCards(prev => prev.slice(0, -1))
+                    playSound('swipe')
+                    toast.success('Swipe undone!')
+                  }
+                } catch (e: any) {
+                  if (e.message?.includes('402') || e.message?.includes('REWIND_LIMIT')) {
+                    toast.error('Free users get 1 rewind per day. Upgrade for unlimited!')
+                  } else {
+                    // Fallback: just do client-side undo
+                    setSwipedCards(prev => prev.slice(0, -1))
+                  }
+                } finally {
+                  setIsRewinding(false)
+                }
               }
             }}
-            disabled={swipedCards.length === 0}
+            disabled={swipedCards.length === 0 || isRewinding}
             className={cn(
               "w-12 h-12 rounded-full flex items-center justify-center",
               "bg-card border-2 border-primary/20 shadow-card",
@@ -223,7 +269,7 @@ export function FeedScreen() {
             )}
             aria-label="Rewind"
           >
-            <RotateCcw className="w-5 h-5 text-primary" />
+            <RotateCcw className={cn("w-5 h-5 text-primary", isRewinding && "animate-spin")} />
           </button>
 
           {/* Like Button */}

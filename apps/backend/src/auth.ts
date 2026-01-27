@@ -13,6 +13,7 @@ import {
 import { z } from 'zod';
 import { AuthenticationError, ValidationError, AppError } from './errors';
 import { checkRateLimit } from './ratelimit';
+import { logger } from './logger';
 
 // Zod Schemas for Validation
 const LoginEmailSchema = z.object({
@@ -138,7 +139,7 @@ export async function handleAuth(request: Request, env: Env): Promise<Response> 
             let isNewUser = true;
 
             if (existingUser) {
-                console.log(`[AUTH] Merging passkey for existing email: ${email}`);
+                logger.info('passkey_merge', undefined, { email });
                 finalUserId = existingUser.id as string;
                 isNewUser = false;
             } else {
@@ -348,7 +349,7 @@ export async function handleAuth(request: Request, env: Env): Promise<Response> 
             const res = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(idToken)}`);
             const data = await res.json() as { email?: string; sub?: string; error?: string; error_description?: string };
             if (!res.ok || data.error) {
-                console.error('[AUTH] Google tokeninfo error:', data.error || data.error_description || res.statusText);
+                logger.error('google_auth_error', data.error || data.error_description, { status: res.status });
                 return new Response(JSON.stringify({
                     success: false,
                     error: 'Invalid or expired Google sign-in. Please try again.',
@@ -359,7 +360,7 @@ export async function handleAuth(request: Request, env: Env): Promise<Response> 
             }
             payload = data;
         } catch (e) {
-            console.error('[AUTH] Google token verification failed:', e);
+            logger.error('google_auth_failed', e);
             return new Response(JSON.stringify({
                 success: false,
                 error: 'Google sign-in verification failed. Please try again.',
@@ -446,7 +447,9 @@ async function sendEmail(to: string, text: string, env: Env) {
     const apiKey = env.RESEND_API_KEY || env.CLOUDFLARE_API_TOKEN;
 
     if (!apiKey) {
-        console.log(`[AUTH] ⚠️ No API Key found for email. OTP for ${to}: ${text}`);
+        // In production, OTP is only stored in DB - never logged
+        // Fallback: store in temporary table or just fail silently
+        logger.warn('otp_email_skipped', 'RESEND_API_KEY not configured', { email: to });
         return;
     }
 
@@ -458,9 +461,18 @@ async function sendEmail(to: string, text: string, env: Env) {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                from: 'Love Vibes <onboarding@resend.dev>', // Default for unverified domains
+                from: 'Love Vibes <noreply@lovevibes.app>',
                 to: [to],
-                subject: 'Login to Love Vibes',
+                subject: 'Your Love Vibes Login Code',
+                html: `
+                    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                        <h1 style="color: #D4AF37;">Love Vibes</h1>
+                        <h2>Your Login Code</h2>
+                        <p style="font-size: 32px; letter-spacing: 8px; font-weight: bold; background: #f5f5f5; padding: 16px; text-align: center; border-radius: 8px;">${text}</p>
+                        <p style="color: #666;">This code expires in 10 minutes.</p>
+                        <p style="color: #999; font-size: 12px;">If you didn't request this code, you can ignore this email.</p>
+                    </div>
+                `,
                 text: text
             })
         });
@@ -468,12 +480,12 @@ async function sendEmail(to: string, text: string, env: Env) {
         const result: any = await response.json();
 
         if (!response.ok) {
-            console.error(`[AUTH] ❌ Resend Error:`, result);
+            logger.error('otp_email_failed', result, { email: to });
         } else {
-            console.log(`[AUTH] ✅ Email dispatched via Resend:`, result.id);
+            logger.info('otp_email_sent', undefined, { email: to, messageId: result.id });
         }
     } catch (e) {
-        console.error(`[AUTH] ❌ Email Fetch Error:`, e);
+        logger.error('otp_email_error', e, { email: to });
     }
 }
 

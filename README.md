@@ -13,7 +13,7 @@
 ## Tech Stack
 
 | Layer | Technology |
-|-------|------------|
+| :--- | :--- |
 | **Backend** | Cloudflare Workers, Durable Objects, D1, R2 |
 | **Frontend** | Next.js (Cloudflare Pages) |
 | **Mobile** | Capacitor (Android / iOS) |
@@ -25,7 +25,7 @@
 
 ## Monorepo Structure
 
-```
+```text
 love-vibes/
 │
 ├── backend/               # Cloudflare Workers API & WebSockets
@@ -59,7 +59,7 @@ love-vibes/
 
 ## Development Principles
 
-|- **Main branch is always deployable**
+- **Main branch is always deployable**
 - No direct commits to `main`
 - All changes via pull requests
 - Clear, intentional commit history
@@ -69,7 +69,7 @@ love-vibes/
 
 ## Branching Strategy
 
-```
+```text
 main            → production-ready
 feature/*       → new features
 fix/*           → bug fixes
@@ -101,7 +101,7 @@ npm run dev
 ## Deployment
 
 | Service | Platform |
-|---------|----------|
+| :--- | :--- |
 | Backend | Cloudflare Workers |
 | Frontend | Cloudflare Pages |
 | Database | D1 |

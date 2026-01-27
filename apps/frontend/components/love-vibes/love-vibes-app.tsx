@@ -33,7 +33,8 @@ import { BoostScreen } from "./boost/boost-screen"
 import { InnovativeFeaturesScreen } from "./settings/innovative-features-screen"
 import { IdentitySignatureScreen } from "./viral/identity-signature-screen"
 import { VisibilitySettingsScreen } from "./settings/visibility-settings-screen"
-
+import { AdminModerationScreen } from "./admin/moderation-dashboard"
+import { LocationScreen as LocationSettingsScreen } from "./onboarding/location-screen"
 
 export function LoveVibesApp() {
   const { currentScreen, isOnboarded } = useApp()
@@ -59,7 +60,7 @@ export function LoveVibesApp() {
         {currentScreen === "privacy-policy" && <LegalScreen type="privacy" />}
         {currentScreen === "terms-of-service" && <LegalScreen type="terms" />}
         {!["welcome", "phone", "mode", "profile-setup", "prompts", "video", "location", "privacy-policy", "terms-of-service"].includes(currentScreen) && <WelcomeScreen />}
-        <DevToolbar />
+        {process.env.NODE_ENV === 'development' && <DevToolbar />}
       </div>
     )
   }
@@ -93,11 +94,14 @@ export function LoveVibesApp() {
         {currentScreen === "boost" && <BoostScreen />}
         {currentScreen === "innovative-features" && <InnovativeFeaturesScreen />}
         {currentScreen === "identity-signature" && <IdentitySignatureScreen />}
+        {/* Admin screens */}
+        {currentScreen === "admin" && <AdminModerationScreen onBack={() => { }} />}
+        {currentScreen === "location-settings" && <LocationSettingsScreen />}
         {/* Redirect legacy social-endorsements to new dashboard */}
         {currentScreen === "social-endorsements" && <ReferralDashboardScreen />}
       </main>
       {showBottomNav && <BottomNav />}
-      <DevToolbar />
+      {process.env.NODE_ENV === 'development' && <DevToolbar />}
     </div>
   )
 }

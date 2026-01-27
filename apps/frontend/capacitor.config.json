@@ -2,10 +2,6 @@
     "appId": "love.vibes",
     "appName": "Love Vibes",
     "webDir": "out",
-    "server": {
-        "url": "https://603d91e3.love-vibes-frontend.pages.dev",
-        "cleartext": true
-    },
     "android": {
         "allowMixedContent": true
     }

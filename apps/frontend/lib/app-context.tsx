@@ -6,7 +6,7 @@ import { api } from "./api-client"
 import { startRegistration, startAuthentication } from "@simplewebauthn/browser"
 
 export type AppMode = "dating" | "friendship"
-export type AppScreen = "welcome" | "phone" | "mode" | "profile-setup" | "prompts" | "video" | "location" | "feed" | "matches" | "chat" | "profile" | "settings" | "filters" | "credits" | "expanded-profile" | "location-settings" | "visibility-settings" | "notification-settings" | "blocked-users" | "privacy-policy" | "terms-of-service" | "help-center" | "vibe-windows" | "voice-feed" | "success-stories" | "referral-dashboard" | "chemistry-test" | "mutual-friends" | "boost" | "innovative-features" | "identity-signature" | "social-endorsements"
+export type AppScreen = "welcome" | "phone" | "mode" | "profile-setup" | "prompts" | "video" | "location" | "feed" | "matches" | "chat" | "profile" | "settings" | "filters" | "credits" | "expanded-profile" | "location-settings" | "visibility-settings" | "notification-settings" | "blocked-users" | "privacy-policy" | "terms-of-service" | "help-center" | "vibe-windows" | "voice-feed" | "success-stories" | "referral-dashboard" | "chemistry-test" | "mutual-friends" | "boost" | "innovative-features" | "identity-signature" | "social-endorsements" | "admin"
 
 export interface User {
   id: string

@@ -6,6 +6,7 @@ import { Env } from './index';
 import { verifyAuth } from './auth';
 import { z } from 'zod';
 import { ValidationError, AuthenticationError, AppError } from './errors';
+import { notifyNewMatch } from './notifications';
 
 const SwipeSchema = z.object({
     id: z.string().uuid(),
@@ -53,6 +54,18 @@ export async function handleSwipe(request: Request, env: Env): Promise<Response>
             await env.DB.prepare(
                 "UPDATE Matches SET chat_room_do_id = ? WHERE id = ?"
             ).bind(doId.toString(), matchId).run();
+
+            // Get user names for notification
+            const [currentUser, targetUser] = await Promise.all([
+                env.DB.prepare("SELECT name FROM Users WHERE id = ?").bind(userId).first(),
+                env.DB.prepare("SELECT name FROM Users WHERE id = ?").bind(targetId).first()
+            ]);
+
+            // Send push notifications to both users
+            await Promise.all([
+                notifyNewMatch(env, userId, (targetUser?.name as string) || 'Someone'),
+                notifyNewMatch(env, targetId as string, (currentUser?.name as string) || 'Someone')
+            ]);
 
             matchData = {
                 match_id: matchId,

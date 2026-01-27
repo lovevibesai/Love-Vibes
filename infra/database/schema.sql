@@ -194,3 +194,210 @@ CREATE TABLE Transactions (
 );
 
 CREATE INDEX idx_transactions_user ON Transactions(user_id);
+
+-- 10. Rate Limiting
+CREATE TABLE RateLimits (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id TEXT NOT NULL,
+    action TEXT NOT NULL, -- 'swipe', 'message', 'signup', 'api'
+    timestamp INTEGER NOT NULL
+);
+
+CREATE INDEX idx_ratelimits_user_action ON RateLimits(user_id, action, timestamp);
+
+-- 11. Push Notifications Subscriptions
+CREATE TABLE PushSubscriptions (
+    user_id TEXT PRIMARY KEY,
+    endpoint TEXT NOT NULL,
+    p256dh TEXT NOT NULL,
+    auth TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    FOREIGN KEY(user_id) REFERENCES Users(id)
+);
+
+-- 12. Rewind History (for free user limits)
+CREATE TABLE RewindHistory (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id TEXT NOT NULL,
+    date TEXT NOT NULL, -- Date string for daily limit tracking
+    timestamp INTEGER NOT NULL,
+    FOREIGN KEY(user_id) REFERENCES Users(id)
+);
+
+CREATE INDEX idx_rewind_user_date ON RewindHistory(user_id, date);
+
+-- 13. Health Check (for health endpoint write verification)
+CREATE TABLE HealthCheck (
+    id INTEGER PRIMARY KEY,
+    last_check INTEGER NOT NULL
+);
+
+-- 14. Voice Profiles (Voice-First Matching)
+CREATE TABLE VoiceProfiles (
+    user_id TEXT PRIMARY KEY,
+    voice_url TEXT NOT NULL,
+    duration INTEGER DEFAULT 0,
+    tone_score REAL DEFAULT 0,
+    pace_score REAL DEFAULT 0,
+    emotion_score REAL DEFAULT 0,
+    authenticity_score REAL DEFAULT 0,
+    transcription TEXT,
+    created_at INTEGER NOT NULL,
+    FOREIGN KEY(user_id) REFERENCES Users(id)
+);
+
+-- 15. Voice Swipes
+CREATE TABLE VoiceSwipes (
+    actor_id TEXT NOT NULL,
+    target_id TEXT NOT NULL,
+    type TEXT NOT NULL, -- 'LIKE', 'PASS'
+    photos_unlocked BOOLEAN DEFAULT FALSE,
+    timestamp INTEGER NOT NULL,
+    PRIMARY KEY (actor_id, target_id)
+);
+
+CREATE INDEX idx_voice_swipes_target ON VoiceSwipes(target_id, actor_id);
+
+-- 16. Vibe Windows (Scheduled Matching)
+CREATE TABLE VibeWindows (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id TEXT NOT NULL,
+    day_of_week INTEGER NOT NULL, -- 0-6 (Sunday-Saturday)
+    start_hour INTEGER NOT NULL, -- 0-23
+    duration_minutes INTEGER DEFAULT 60,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at INTEGER NOT NULL,
+    FOREIGN KEY(user_id) REFERENCES Users(id)
+);
+
+CREATE INDEX idx_vibe_windows_user ON VibeWindows(user_id);
+
+-- 17. Proximity Settings
+CREATE TABLE ProximitySettings (
+    user_id TEXT PRIMARY KEY,
+    enabled BOOLEAN DEFAULT FALSE,
+    current_lat REAL,
+    current_long REAL,
+    last_updated INTEGER,
+    FOREIGN KEY(user_id) REFERENCES Users(id)
+);
+
+-- 18. Proximity Alerts
+CREATE TABLE ProximityAlerts (
+    id TEXT PRIMARY KEY,
+    user_a_id TEXT NOT NULL,
+    user_b_id TEXT NOT NULL,
+    distance_meters INTEGER NOT NULL,
+    venue_name TEXT,
+    venue_address TEXT,
+    venue_type TEXT,
+    status TEXT DEFAULT 'sent', -- 'sent', 'accepted', 'declined', 'expired'
+    created_at INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL
+);
+
+CREATE INDEX idx_proximity_alerts_users ON ProximityAlerts(user_a_id, user_b_id);
+
+-- 19. Success Stories
+CREATE TABLE SuccessStories (
+    id TEXT PRIMARY KEY,
+    user_a_id TEXT NOT NULL,
+    user_b_id TEXT NOT NULL,
+    user_a_name TEXT,
+    user_b_name TEXT,
+    user_a_photo TEXT,
+    user_b_photo TEXT,
+    story_text TEXT NOT NULL,
+    relationship_length TEXT,
+    wedding_fund_contributed BOOLEAN DEFAULT FALSE,
+    is_featured BOOLEAN DEFAULT FALSE,
+    approved BOOLEAN DEFAULT FALSE,
+    created_at INTEGER NOT NULL
+);
+
+CREATE INDEX idx_success_stories_approved ON SuccessStories(approved, is_featured);
+
+-- 20. Moderation Actions (Admin Warnings)
+CREATE TABLE ModerationActions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id TEXT NOT NULL,
+    action TEXT NOT NULL, -- 'WARNING', 'BAN', etc.
+    reason TEXT,
+    admin_id TEXT NOT NULL,
+    timestamp INTEGER NOT NULL,
+    FOREIGN KEY(user_id) REFERENCES Users(id)
+);
+
+-- 21. Password Reset Tokens
+CREATE TABLE PasswordResetTokens (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id TEXT NOT NULL,
+    token TEXT NOT NULL UNIQUE,
+    expires_at INTEGER NOT NULL,
+    created_at INTEGER NOT NULL,
+    FOREIGN KEY(user_id) REFERENCES Users(id)
+);
+
+CREATE INDEX idx_password_reset_token ON PasswordResetTokens(token);
+
+-- 22. Chemistry Tests
+CREATE TABLE ChemistryTests (
+    id TEXT PRIMARY KEY,
+    user_a_id TEXT NOT NULL,
+    user_b_id TEXT NOT NULL,
+    user_a_answers JSON,
+    user_b_answers JSON,
+    compatibility_score REAL,
+    status TEXT DEFAULT 'pending', -- 'pending', 'completed'
+    created_at INTEGER NOT NULL,
+    completed_at INTEGER
+);
+
+CREATE INDEX idx_chemistry_tests_users ON ChemistryTests(user_a_id, user_b_id);
+
+-- 23. Intro Requests (Mutual Friends)
+CREATE TABLE IntroRequests (
+    id TEXT PRIMARY KEY,
+    requester_id TEXT NOT NULL,
+    target_id TEXT NOT NULL,
+    mutual_friend_id TEXT NOT NULL,
+    message TEXT,
+    status TEXT DEFAULT 'pending', -- 'pending', 'approved', 'declined'
+    created_at INTEGER NOT NULL,
+    resolved_at INTEGER
+);
+
+CREATE INDEX idx_intro_requests_mutual ON IntroRequests(mutual_friend_id, status);
+
+-- 24. Active Boosts (Profile Visibility)
+CREATE TABLE ActiveBoosts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id TEXT NOT NULL,
+    started_at INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL,
+    views_gained INTEGER DEFAULT 0,
+    FOREIGN KEY(user_id) REFERENCES Users(id)
+);
+
+CREATE INDEX idx_active_boosts_user ON ActiveBoosts(user_id, expires_at);
+
+-- 25. Processed Webhooks (Stripe Idempotency)
+CREATE TABLE ProcessedWebhooks (
+    event_id TEXT PRIMARY KEY,
+    event_type TEXT NOT NULL,
+    processed_at INTEGER NOT NULL
+);
+
+-- 26. Chat Messages (Persistent Chat History)
+CREATE TABLE ChatMessages (
+    id TEXT PRIMARY KEY,
+    match_id TEXT NOT NULL,
+    sender_id TEXT NOT NULL,
+    message_text TEXT NOT NULL,
+    message_type TEXT DEFAULT 'text', -- 'text', 'gift', 'image'
+    created_at INTEGER NOT NULL,
+    FOREIGN KEY(match_id) REFERENCES Matches(id),
+    FOREIGN KEY(sender_id) REFERENCES Users(id)
+);
+
+CREATE INDEX idx_chat_messages_match ON ChatMessages(match_id, created_at);

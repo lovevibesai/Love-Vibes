@@ -5,6 +5,7 @@ import { Env } from './index'
 import { z } from 'zod';
 import { AuthenticationError, ValidationError, AppError } from './errors';
 import { logger } from './logger';
+import { notifyNewMatch } from './notifications';
 
 // Zod Schemas
 const VoiceSwipeSchema = z.object({
@@ -146,6 +147,18 @@ export async function voiceSwipe(
             )
                 .bind(matchId, actorId, targetId, now)
                 .run()
+
+            // Get user names for notification
+            const [actorUser, targetUser] = await Promise.all([
+                env.DB.prepare('SELECT name FROM Users WHERE id = ?').bind(actorId).first(),
+                env.DB.prepare('SELECT name FROM Users WHERE id = ?').bind(targetId).first()
+            ])
+
+            // Send push notifications to both users
+            await Promise.all([
+                notifyNewMatch(env, actorId, (targetUser?.name as string) || 'Someone'),
+                notifyNewMatch(env, targetId, (actorUser?.name as string) || 'Someone')
+            ])
 
             logger.info('voice_match_created', undefined, { actorId, targetId, matchId });
             return { success: true, mutual_match: true, photos_unlocked: true }

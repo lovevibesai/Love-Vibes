@@ -57,7 +57,7 @@ export function handleApiError(e: any): Response {
     return new Response(JSON.stringify({
         success: false,
         error: {
-            message: e instanceof Error ? e.message : 'An unexpected error occurred',
+            message: 'An unexpected error occurred',
             code: 'INTERNAL_ERROR'
         }
     }), {

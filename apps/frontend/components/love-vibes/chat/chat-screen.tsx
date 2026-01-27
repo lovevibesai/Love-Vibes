@@ -61,6 +61,36 @@ export function ChatScreen() {
   useEffect(() => {
     if (!chatRoomId || !user?.id) return;
 
+    // Fetch chat history first
+    const loadChatHistory = async () => {
+      try {
+        const response = await fetch(`${WS_URL}/chat/${chatRoomId}/history?limit=100`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('auth_token') || ''}`
+          }
+        });
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.messages) {
+            const historicalMessages: Message[] = data.messages.map((msg: any) => ({
+              id: msg.id || Math.random().toString(),
+              text: msg.text || msg.message_text,
+              sender: msg.sender_id === user.id ? "me" : "them",
+              timestamp: new Date(msg.timestamp || msg.created_at),
+              read: true,
+              type: msg.type || msg.message_type || "text",
+              giftName: msg.giftName,
+            }));
+            setMessages(historicalMessages);
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to load chat history:', e);
+      }
+    };
+
+    loadChatHistory();
+
     const socket = new WebSocket(`${WS_URL}/ws/chat?match_id=${chatRoomId}&user_id=${user.id}`);
     socketRef.current = socket;
 
@@ -71,8 +101,14 @@ export function ChatScreen() {
 
     socket.onmessage = (event) => {
       const data = JSON.parse(event.data);
+
+      // Handle system messages (connected, user_left, etc.)
+      if (data.type === 'connected' || data.type === 'user_left') {
+        return;
+      }
+
       const incomingMsg: Message = {
-        id: Math.random().toString(),
+        id: data.id || Math.random().toString(),
         text: data.text,
         sender: data.sender_id === user.id ? "me" : "them",
         timestamp: new Date(data.timestamp),
@@ -81,7 +117,9 @@ export function ChatScreen() {
         giftName: data.giftName,
       };
       setMessages(prev => [...prev, incomingMsg]);
-      playSound("message");
+      if (data.sender_id !== user.id) {
+        playSound("message");
+      }
     };
 
     socket.onclose = () => {
@@ -92,7 +130,7 @@ export function ChatScreen() {
     return () => {
       socket.close();
     };
-  }, [chatRoomId]);
+  }, [chatRoomId, user?.id]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
