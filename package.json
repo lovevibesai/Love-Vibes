@@ -12,6 +12,8 @@
     },
     "author": "Love Vibes",
     "optionalDependencies": {
+        "@next/swc-linux-x64-gnu": "15.4.10",
+        "@next/swc-linux-x64-musl": "15.4.10",
         "@tailwindcss/oxide-linux-x64-gnu": "4.1.18",
         "@tailwindcss/oxide-linux-x64-musl": "4.1.18",
         "lightningcss-linux-x64-gnu": "1.30.2",
