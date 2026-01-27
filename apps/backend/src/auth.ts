@@ -461,7 +461,21 @@ export async function handleAuth(request: Request, env: Env): Promise<Response> 
         }), { expirationTtl: Math.floor(OTP_EXPIRY_MS / 1000) });
 
         // 2. Send via Resend
-        await sendEmail(email, `Your Love Vibes code: ${otp}`, env);
+        const emailResult = await sendEmail(email, otp, env);
+
+        if (!emailResult.success) {
+            // Check if it's a config error or a service error
+            if (!env.RESEND_API_KEY) {
+                return new Response(JSON.stringify({
+                    success: false,
+                    error: "Email service misconfigured. Please set RESEND_API_KEY in Cloudflare Secrets."
+                }), { status: 503, headers: { 'Content-Type': 'application/json' } });
+            }
+            return new Response(JSON.stringify({
+                success: false,
+                error: emailResult.error || "Failed to transmit OTP. Please try again later."
+            }), { status: 500, headers: { 'Content-Type': 'application/json' } });
+        }
 
         return new Response(JSON.stringify({ success: true, message: "OTP sent" }), {
             headers: { 'Content-Type': 'application/json' }
@@ -689,13 +703,16 @@ export async function verifyAuth(request: Request, env: Env): Promise<string | n
     }
 }
 
-async function sendEmail(to: string, text: string, env: Env) {
+async function sendEmail(to: string, text: string, env: Env): Promise<{ success: boolean; error?: string }> {
     const apiKey = env.RESEND_API_KEY;
 
     if (!apiKey) {
         logger.error('otp_email_skipped', 'RESEND_API_KEY is not configured in environment variables', { email: to });
-        return;
+        return { success: false, error: "RESEND_API_KEY is missing. Please add it to Cloudflare Secrets." };
     }
+
+    // Determine the 'from' address. Resend requires verified domains or 'onboarding@resend.dev'
+    const fromAddress = env.RESEND_FROM_EMAIL || 'Love Vibes <noreply@lovevibes.app>';
 
     try {
         const response = await fetch('https://api.resend.com/emails', {
@@ -705,31 +722,47 @@ async function sendEmail(to: string, text: string, env: Env) {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                from: 'Love Vibes <noreply@lovevibes.app>',
+                from: fromAddress,
                 to: [to],
                 subject: 'Your Love Vibes Login Code',
                 html: `
-                    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                        <h1 style="color: #D4AF37;">Love Vibes</h1>
-                        <h2>Your Login Code</h2>
-                        <p style="font-size: 32px; letter-spacing: 8px; font-weight: bold; background: #f5f5f5; padding: 16px; text-align: center; border-radius: 8px;">${text}</p>
-                        <p style="color: #666;">This code expires in 10 minutes.</p>
-                        <p style="color: #999; font-size: 12px;">If you didn't request this code, you can ignore this email.</p>
+                    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 12px;">
+                        <h1 style="color: #D4AF37; text-align: center;">Love Vibes</h1>
+                        <p style="font-size: 16px; color: #333;">Enter the following code to access your vault:</p>
+                        <div style="font-size: 32px; letter-spacing: 8px; font-weight: bold; background: #f9f9f9; padding: 20px; text-align: center; border-radius: 12px; border: 1px solid #D4AF37; color: #D4AF37; margin: 20px 0;">
+                            ${text}
+                        </div>
+                        <p style="color: #666; font-size: 14px;">This code expires in 10 minutes. If you didn't request this, please ignore this email.</p>
+                        <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;" />
+                        <p style="color: #999; font-size: 12px; text-align: center;">&copy; 2026 Love Vibes AI. Secured by Resend.</p>
                     </div>
                 `,
-                text: text
+                text: `Your Love Vibes login code is: ${text}`
             })
         });
 
-        const result = await response.json() as Record<string, unknown>;
+        const result = await response.json() as any;
 
         if (!response.ok) {
-            logger.error('otp_email_failed', result, { email: to });
-        } else {
-            logger.info('otp_email_sent', undefined, { email: to, messageId: result.id });
+            const resendError = result.message || (result.errors && result.errors[0]?.message) || `Error ${response.status}`;
+            logger.error('otp_email_failed', result, { email: to, status: response.status });
+
+            // Provide helpful feedback for common Resend errors
+            if (response.status === 403 && resendError.includes('domain')) {
+                return { success: false, error: "Resend: Domain not verified. Use 'onboarding@resend.dev' or verify lovevibes.app." };
+            }
+            if (response.status === 401) {
+                return { success: false, error: "Resend: Invalid API Key. Please verify your RESEND_API_KEY." };
+            }
+
+            return { success: false, error: `Resend: ${resendError}` };
         }
-    } catch (e) {
+
+        logger.info('otp_email_sent', undefined, { email: to, messageId: result.id });
+        return { success: true };
+    } catch (e: any) {
         logger.error('otp_email_error', e, { email: to });
+        return { success: false, error: `Network error: ${e.message}` };
     }
 }
 
