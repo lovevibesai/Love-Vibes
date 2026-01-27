@@ -43,7 +43,8 @@ export function PhoneScreen() {
         await loginWithEmail(email)
         setStep("method")
       } catch (e: any) {
-        toast.error(e.message || "Protocol error: Failed to transmit OTP")
+        console.error("DIAGNOSTIC: OTP Error", e)
+        toast.error(`[Build 101] Fault: ${e.message || "Unknown error"}`)
       } finally {
         setLoading(false)
       }
