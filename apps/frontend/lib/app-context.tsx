@@ -83,7 +83,7 @@ interface AppContextType {
   loginWithEmail: (email: string) => Promise<void>
   verifyEmailOTP: (email: string, otp: string) => Promise<void>
   loginWithGoogle: (idToken: string) => Promise<void>
-  loginWithPasskey: () => Promise<void>
+  loginWithPasskey: (email?: string) => Promise<void>
   loadFeed: (lat: number, long: number) => Promise<any[] | undefined>
   isLoggingIn: boolean
 }
@@ -309,10 +309,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     handleAuthenticatedUser(data);
   }
 
-  const loginWithPasskey = async () => {
+  const loginWithPasskey = async (email?: string) => {
     setIsLoggingIn(true);
     try {
-      const options = await api.auth.getLoginOptions();
+      const options = await api.auth.getLoginOptions(email);
       const authResp = await startAuthentication({ optionsJSON: options });
       const verifyResp = await api.auth.verifyLoginPasskey(authResp, options.challengeId);
       if (verifyResp.success) {
@@ -321,11 +321,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         throw new Error("Verification failed");
       }
     } catch (e: any) {
-      toast({
-        title: "Login Error",
-        description: e?.message || "Passkey login failed.",
-        variant: "destructive",
-      });
+      console.error("Passkey login failed in context:", e);
+      throw e; // Rethrow to let the UI handle it (e.g. fallback to OTP)
     } finally {
       setIsLoggingIn(false);
     }

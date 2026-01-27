@@ -16,7 +16,7 @@ import {
 import { toast } from "sonner"
 
 export function PhoneScreen() {
-  const { setCurrentScreen, loginWithEmail, verifyEmailOTP, registerPasskey } = useApp()
+  const { setCurrentScreen, loginWithEmail, verifyEmailOTP, registerPasskey, loginWithPasskey } = useApp()
   const [email, setEmail] = useState("")
   const [otp, setOtp] = useState("")
   const [step, setStep] = useState<"email" | "method" | "otp">("email")
@@ -42,9 +42,19 @@ export function PhoneScreen() {
   const handlePasskeyLogin = async () => {
     setLoading(true)
     try {
-      await registerPasskey(email)
-    } catch (e) {
-      toast.error("Biometric bypass failed. Reverting to OTP.")
+      // Robust attempt: Try to login with existing passkey first
+      await loginWithPasskey(email)
+    } catch (e: any) {
+      console.warn("Passkey login failed, trying registration or fallback:", e)
+
+      // If it's a 'NotAllowedError' (user cancelled), don't show scary error
+      if (e.name === 'NotAllowedError' || e.name === 'AbortError') {
+        toast.info("Secure login cancelled.")
+        return
+      }
+
+      // Reverting to OTP is the most robust fallback
+      toast.error("Biometric link not found. Using secure code instead.")
       setStep("otp")
     } finally {
       setLoading(false)

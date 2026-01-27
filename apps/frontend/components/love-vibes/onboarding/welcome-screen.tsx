@@ -42,9 +42,21 @@ export function WelcomeScreen() {
   const [mounted, setMounted] = useState(false)
   const [authError, setAuthError] = useState<string | null>(null)
 
+  const [isWebAuthnSupported, setIsWebAuthnSupported] = useState<boolean>(true)
+
   useEffect(() => {
     setMounted(true)
     setParticles(generateParticles(15))
+
+    // WebAuthn Support Detection
+    if (typeof window !== "undefined") {
+      const supported = !!(
+        window.PublicKeyCredential &&
+        window.navigator.credentials &&
+        window.navigator.credentials.create
+      )
+      setIsWebAuthnSupported(supported)
+    }
   }, [])
 
   const toggleTheme = useCallback(() => {
@@ -73,12 +85,21 @@ export function WelcomeScreen() {
 
   const handlePasskeyLogin = async () => {
     if (isLoggingIn) return
+    if (!isWebAuthnSupported) {
+      setCurrentScreen("phone")
+      return
+    }
     setAuthError(null)
     try {
       await loginWithPasskey()
-    } catch (e) {
-      console.error("Passkey login failed, falling back to phone:", e)
-      setCurrentScreen("phone")
+    } catch (e: any) {
+      console.error("Passkey login failed:", e)
+      // Only fallback to phone if it's not a user cancellation
+      if (e.name !== 'NotAllowedError' && e.name !== 'AbortError') {
+        setCurrentScreen("phone")
+      } else {
+        setAuthError("Login cancelled.")
+      }
     }
   }
 
@@ -244,7 +265,7 @@ export function WelcomeScreen() {
             <button
               onClick={handlePasskeyLogin}
               disabled={isLoggingIn}
-              className="w-full h-16 rounded-2xl relative overflow-hidden group transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
+              className={`w-full h-16 rounded-2xl relative overflow-hidden group transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] ${!isWebAuthnSupported ? 'opacity-70 saturate-50' : ''}`}
               style={{
                 background: "linear-gradient(135deg, #2A0D1F 0%, #7A1F3D 50%, #C84A4A 100%)",
                 boxShadow: "0 10px 30px -10px rgba(200, 74, 74, 0.5)",
@@ -252,7 +273,7 @@ export function WelcomeScreen() {
             >
               <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
               <div className="absolute top-2 right-2 px-2 py-0.5 rounded-full bg-white/10 backdrop-blur-md border border-white/10 text-[8px] font-bold text-white tracking-widest uppercase">
-                Secure
+                {isWebAuthnSupported ? "Secure" : "Unavailable"}
               </div>
               <div className="flex items-center justify-center gap-3 text-white">
                 {isLoggingIn ? (
@@ -260,7 +281,9 @@ export function WelcomeScreen() {
                 ) : (
                   <>
                     <ShieldCheck className="w-5 h-5" />
-                    <span className="font-bold tracking-wide">Secure Login</span>
+                    <span className="font-bold tracking-wide">
+                      {isWebAuthnSupported ? "Secure Login" : "Passkeys Unavailable"}
+                    </span>
                   </>
                 )}
               </div>
