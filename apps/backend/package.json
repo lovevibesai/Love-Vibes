@@ -5,7 +5,9 @@
   "private": true,
   "scripts": {
     "dev": "wrangler dev",
-    "build": "echo 'No build step required'",
+    "build": "wrangler types && tsc --noEmit",
+    "lint": "eslint .",
+    "type-check": "tsc --noEmit",
     "deploy": "wrangler deploy",
     "cf-typegen": "wrangler types",
     "test": "vitest run"

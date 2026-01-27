@@ -7,27 +7,112 @@ on:
     paths:
       - 'apps/backend/**'
       - 'infra/database/**'
+      - '.github/workflows/deploy-backend.yml'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - staging
+
+# Prevent concurrent deployments
+concurrency:
+  group: deploy-backend-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  NODE_VERSION: '20'
+  WRANGLER_VERSION: '4.60.0'
 
 jobs:
-  deploy:
+  # Validation and testing stage
+  validate:
     runs-on: ubuntu-latest
-    name: Deploy Worker
+    name: Validate & Test
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Setup Node
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
+          cache-dependency-path: 'package-lock.json'
 
-      - name: Install backend dependencies
+      - name: Install dependencies
         run: npm install
+
+      - name: Run linter
+        run: npm run lint
         working-directory: apps/backend
 
+      - name: Run type checking
+        run: npm run type-check
+        working-directory: apps/backend
+
+      - name: Run tests
+        run: npm test
+        working-directory: apps/backend
+
+      - name: Build project
+        run: npm run build
+        working-directory: apps/backend
+
+  # Security scanning
+  security:
+    runs-on: ubuntu-latest
+    name: Security Scan
+    needs: validate
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: 'package-lock.json'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run dependency audit
+        run: npm audit --audit-level=moderate
+        continue-on-error: true
+
+  # Deployment stage
+  deploy:
+    runs-on: ubuntu-latest
+    name: Deploy to Cloudflare Workers
+    needs: [validate, security]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: 'package-lock.json'
+
+      - name: Install dependencies
+        run: npm install
+
       - name: Deploy to Cloudflare Workers
+        id: deploy
         working-directory: apps/backend
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: npx wrangler deploy
+        run: |
+          echo "Deploying to Cloudflare Workers..."
+          npx wrangler@${{ env.WRANGLER_VERSION }} deploy
