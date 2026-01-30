@@ -64,6 +64,10 @@ export function WelcomeScreen() {
   }, [resolvedTheme, setTheme])
 
   const handleGoogleSignIn = async () => {
+    if (!auth || !googleProvider) {
+      setAuthError("Authentication service is currently unavailable.");
+      return;
+    }
     setAuthError(null)
     try {
       const result = await signInWithPopup(auth, googleProvider)

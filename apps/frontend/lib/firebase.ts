@@ -29,29 +29,34 @@ const firebaseConfig = {
 };
 
 // Initialize Firebase Instance
-const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
+// We check for apiKey to prevent initialization errors during build-time if env vars are missing
+const app = getApps().length > 0 
+    ? getApp() 
+    : (firebaseConfig.apiKey ? initializeApp(firebaseConfig) : null);
 
 // Initialize Auth with cross-platform persistence
-export const auth = getAuth(app);
+export const auth = app ? getAuth(app) : null;
 
 // Set persistence to ensure users stay logged in across sessions
 // We use a combination that works for both Web and Mobile (Capacitor)
-if (typeof window !== "undefined") {
+if (typeof window !== "undefined" && auth) {
     setPersistence(auth, indexedDBLocalPersistence).catch(() => {
         setPersistence(auth, browserLocalPersistence);
     });
 }
 
-export const googleProvider = new GoogleAuthProvider();
-googleProvider.addScope('profile');
-googleProvider.addScope('email');
+export const googleProvider = app ? new GoogleAuthProvider() : null;
+if (googleProvider) {
+    googleProvider.addScope('profile');
+    googleProvider.addScope('email');
+}
 
 /**
  * Initialize Analytics
  * Only runs in the browser and if supported
  */
 export const initAnalytics = async () => {
-    if (typeof window !== "undefined") {
+    if (typeof window !== "undefined" && app) {
         const supported = await isAnalyticsSupported();
         if (supported) {
             return getAnalytics(app);
@@ -67,7 +72,7 @@ export const initAnalytics = async () => {
 export const VAPID_KEY = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY;
 
 export const initMessaging = async () => {
-    if (typeof window !== "undefined") {
+    if (typeof window !== "undefined" && app) {
         const supported = await isMessagingSupported();
         if (supported) {
             const messaging = getMessaging(app);
