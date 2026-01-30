@@ -23,5 +23,11 @@
         "@ionic/cli-framework-output": "^2.2.8",
         "cookie": "^1.1.1",
         "undici": "^7.19.1"
+    },
+    "dependencies": {
+        "@capacitor/camera": "^8.0.0",
+        "@capacitor/core": "^8.0.2",
+        "@capacitor/geolocation": "^8.0.0",
+        "@simplewebauthn/browser": "^13.2.2"
     }
 }
