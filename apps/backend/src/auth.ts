@@ -704,6 +704,7 @@ export async function verifyAuth(request: Request, env: Env): Promise<string | n
         const { payload } = await jwtVerify(token, getJwtSecret(env));
         return payload.uid as string;
     } catch (_e) {
+        // Token verification failed, return null to indicate unauthenticated
         return null;
     }
 }

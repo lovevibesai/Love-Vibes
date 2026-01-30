@@ -29,7 +29,7 @@ export function TrustScore({ score, size = "md", showLabel = false }: TrustScore
     lg: { container: "w-14 h-14", stroke: 4, fontSize: "text-sm" },
   }
 
-  const { container, stroke, fontSize } = sizes[size]
+  const { container, stroke, fontSize } = sizes[size as keyof typeof sizes] || sizes.md
   const radius = 18
   const circumference = 2 * Math.PI * radius
   const progress = (score / 100) * circumference

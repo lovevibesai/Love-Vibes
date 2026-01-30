@@ -19,13 +19,13 @@ import { getMessaging, isSupported as isMessagingSupported, getToken } from "fir
 // NOTE: These fallbacks ensure the app builds even if GitHub Secrets are missing.
 // For true production isolation, set these variables in GitHub/Cloudflare.
 const firebaseConfig = {
-    apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "AIzaSyCN2Vi16pqsUI42FJnk9ewtJ8gdPllXpRk",
-    authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || "lovevibes-007.firebaseapp.com",
-    projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "lovevibes-007",
-    storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || "lovevibes-007.firebasestorage.app",
-    messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || "736608188330",
-    appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || "1:736608188330:web:eca8fa6821b44ad1915dd3",
-    measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID || "G-5J87QYPQ6H"
+    apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+    authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+    projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+    storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+    messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+    appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+    measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID
 };
 
 // Initialize Firebase Instance
@@ -64,7 +64,7 @@ export const initAnalytics = async () => {
  * Initialize Cloud Messaging (Push Notifications)
  * Includes VAPID key and basic token retrieval logic
  */
-export const VAPID_KEY = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY || "cM6EgnZR1GW-mfC1VGrhjey9ACTMsUY6eaRK6QTYKu0";
+export const VAPID_KEY = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY;
 
 export const initMessaging = async () => {
     if (typeof window !== "undefined") {

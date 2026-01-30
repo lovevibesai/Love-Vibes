@@ -2,6 +2,7 @@
 // Cloudflare Workers rate limiting implementation
 
 import { Env } from './index'
+import { logger } from './logger'
 
 interface RateLimitConfig {
     maxRequests: number
@@ -58,9 +59,9 @@ export async function checkRateLimit(
 
         return { allowed: true, remaining, resetAt }
     } catch (error) {
-        console.error('Rate limit check failed:', error)
-        // Fail closed - deny request on system error to prevent abuse
-        return { allowed: false, remaining: 0, resetAt: now + config.windowSeconds }
+        logger.error('rate_limit_check_failed', error)
+        // Fail open - allow request on system error to prevent blocking legitimate users
+        return { allowed: true, remaining: 1, resetAt: now + config.windowSeconds }
     }
 }
 

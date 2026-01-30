@@ -28,7 +28,7 @@ export class ChatRoom {
         this.matchId = null;
 
         // Auto-hibernate after 5 minutes of inactivity (increased from 30s)
-        void (this.state as any).setAlarm(Date.now() + 5 * 60 * 1000);
+        void this.state.storage.setAlarm(Date.now() + 5 * 60 * 1000);
     }
 
     async alarm() {
@@ -38,7 +38,7 @@ export class ChatRoom {
             logger.info('chat_room_hibernating', undefined, { matchId: this.matchId });
         } else {
             // Check again later
-            void (this.state as any).setAlarm(Date.now() + 60 * 1000);
+            void this.state.storage.setAlarm(Date.now() + 60 * 1000);
         }
     }
 

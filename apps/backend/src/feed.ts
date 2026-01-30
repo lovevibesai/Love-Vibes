@@ -24,8 +24,15 @@ function latLonToCellId(lat: number, lon: number, level: number = 12): string {
 }
 
 function getNeighboringCells(cellId: string): string[] {
-    const _key = S2.idToKey(cellId);
-    return [cellId];
+    try {
+        const key = S2.idToKey(cellId);
+        const neighbors = S2.getNeighbors(key);
+        const neighborIds = neighbors.map((k: string) => S2.keyToId(k));
+        return [cellId, ...neighborIds];
+    } catch (e) {
+        logger.error('geosharding_neighbors_error', 'Failed to get neighboring cells', { cellId, error: e });
+        return [cellId];
+    }
 }
 
 function calculateCompatibility(u1: any, u2: any): number {

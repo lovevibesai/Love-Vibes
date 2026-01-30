@@ -144,9 +144,19 @@ export async function handleUserUpdate(request: Request, env: Env): Promise<Resp
         const updates = [];
         const values = [];
 
+        // Whitelist of allowed fields to prevent SQL injection
+        const allowedFields = [
+            'name', 'bio', 'age', 'gender', 'interested_in', 'job_title', 
+            'company', 'school', 'city', 'hometown', 'height', 
+            'relationship_goals', 'interests', 'photo_urls', 
+            'main_photo_url', 'is_onboarded', 'onboarding_step', 'mode'
+        ];
+
         for (const [field, value] of Object.entries(body)) {
-            updates.push(`${field} = ?`);
-            values.push(Array.isArray(value) ? JSON.stringify(value) : value);
+            if (allowedFields.includes(field)) {
+                updates.push(`${field} = ?`);
+                values.push(Array.isArray(value) ? JSON.stringify(value) : value);
+            }
         }
 
         if (updates.length === 0) {
@@ -159,6 +169,12 @@ export async function handleUserUpdate(request: Request, env: Env): Promise<Resp
         // Invalidate KV Cache
         if (env.GEO_KV) {
             await env.GEO_KV.delete(`user_profile:${userId}`);
+            
+            // Also invalidate feed cache for this user's cell to reflect profile changes
+            const user = await env.DB.prepare("SELECT s2_cell_id, mode FROM Users WHERE id = ?").bind(userId).first() as any;
+            if (user?.s2_cell_id) {
+                await env.GEO_KV.delete(`feed_cache:${user.s2_cell_id}:${user.mode}`);
+            }
         }
 
         return new Response(JSON.stringify({ success: true, message: 'Profile updated' }), {

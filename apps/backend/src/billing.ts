@@ -106,7 +106,7 @@ export async function handleBilling(request: Request, env: Env): Promise<Respons
 
 export async function handleStripeWebhook(request: Request, env: Env): Promise<Response> {
     const signature = request.headers.get('stripe-signature');
-    const webhookSecret = env.CLOUDFLARE_API_TOKEN; // Using Cloudflare API Token as fallback or placeholder
+    const webhookSecret = env.STRIPE_WEBHOOK_SECRET;
 
     if (!signature) throw new AuthenticationError('Missing Stripe signature');
     if (!webhookSecret) throw new AppError('Webhook not configured', 503, 'CONFIG_ERROR');

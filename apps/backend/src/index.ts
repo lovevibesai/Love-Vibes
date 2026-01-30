@@ -44,6 +44,7 @@ export interface Env {
     RP_ID?: string;
     RESEND_API_KEY?: string;
     RESEND_FROM_EMAIL?: string;
+    STRIPE_WEBHOOK_SECRET?: string;
 }
 
 /**
@@ -68,7 +69,7 @@ export function trackEvent(env: Env, eventName: string, data: Record<string, unk
         // Use type assertion to avoid missing property error in some worker-types versions
         (env.LV_AI as any).writeData({ blobs, doubles });
     } catch (e) {
-        console.error("Analytics Error:", e);
+        logger.error("analytics_error", e);
     }
 }
 
@@ -171,6 +172,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
             try {
                 await env.DB.prepare('SELECT 1').first();
             } catch (_e) {
+                logger.error('health_check_db_read_error', _e);
                 dbRead = 'error';
             }
 
@@ -180,6 +182,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
                     'INSERT OR REPLACE INTO HealthCheck (id, timestamp) VALUES (1, ?)'
                 ).bind(Date.now()).run();
             } catch (_e) {
+                logger.error('health_check_db_write_error', _e);
                 dbWrite = 'error';
             }
         } else {
@@ -197,7 +200,7 @@ async function handleRequest(request: Request, env: Env): Promise<Response> {
             });
             googleAuth = googleRes.ok || googleRes.status === 400 ? 'ok' : 'error';
         } catch (_e) {
-            console.error('Health Check External Error:', _e);
+            logger.error('health_check_external_error', _e);
             googleAuth = 'error';
         }
 
