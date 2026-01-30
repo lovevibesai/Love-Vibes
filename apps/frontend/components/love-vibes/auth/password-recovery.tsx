@@ -5,13 +5,24 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ChevronLeft, Mail, Lock, Eye, EyeOff } from "lucide-react"
 
+import { api } from "@/lib/api-client"
+
 export function ForgotPasswordScreen({ onBack }: { onBack: () => void }) {
     const [email, setEmail] = useState("")
     const [emailSent, setEmailSent] = useState(false)
+    const [isLoading, setIsLoading] = useState(false)
 
-    const handleSendReset = () => {
-        // TODO: Call API to send reset email
-        setEmailSent(true)
+    const handleSendReset = async () => {
+        setIsLoading(true)
+        try {
+            await api.auth.requestPasswordReset(email)
+            setEmailSent(true)
+        } catch (error) {
+            console.error(error)
+            alert("Failed to send reset email. Please try again.")
+        } finally {
+            setIsLoading(false)
+        }
     }
 
     return (
@@ -171,10 +182,10 @@ export function ResetPasswordScreen({ token, onSuccess }: { token: string; onSuc
 
                         <Button
                             onClick={handleResetPassword}
-                            disabled={!password || !confirmPassword}
+                            disabled={!password || !confirmPassword || isLoading}
                             className="w-full h-12 gradient-love text-white font-semibold"
                         >
-                            Reset Password
+                            {isLoading ? "Resetting..." : "Reset Password"}
                         </Button>
                     </div>
                 </div>

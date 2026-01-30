@@ -126,14 +126,58 @@ export async function handleFeed(request: Request, env: Env): Promise<Response> 
             feedRaw = JSON.parse(cachedData);
         } else {
             // 4. Cache Miss - Query D1
-            const { results } = await env.DB.prepare(
-                "SELECT id, name, age, bio, photo_urls, s2_cell_id, mode, trust_score, location, relationship_goals, interests, height, drinking, smoking, exercise_frequency, diet, pets, star_sign " +
-                "FROM Users " +
-                "WHERE s2_cell_id IN (" + cellsToQuery.map(() => '?').join(',') + ") " +
-                "AND mode = ? " +
-                "AND id != ? " +
-                "LIMIT 100" // Fetch more to allow for filtering
-            ).bind(...cellsToQuery, currentUser.mode, userId).all();
+            // FIX: Join with ActiveBoosts for priority
+            // FIX: Exclude Swipes
+            // FIX: Apply Preferences (Age, Gender) - simplified for now using UserPreferences if available, else defaults
+            
+            // Fetch User Preferences
+            const prefResult = await env.DB.prepare(
+                "SELECT * FROM UserPreferences WHERE user_id = ?"
+            ).bind(userId).first() as any;
+
+            const ageMin = prefResult?.age_min || 18;
+            const ageMax = prefResult?.age_max || 99;
+            // Gender filtering logic (0: Men, 1: Women, 2: Everyone)
+            let genderFilter = "";
+            let genderParams: any[] = [];
+            
+            if (prefResult?.show_me === 'men') {
+                genderFilter = "AND gender = 0";
+            } else if (prefResult?.show_me === 'women') {
+                genderFilter = "AND gender = 1";
+            }
+            // 'everyone' or null implies no gender filter
+
+            const query = `
+                SELECT 
+                    u.id, u.name, u.age, u.bio, u.photo_urls, u.s2_cell_id, u.mode, 
+                    u.trust_score, u.location, u.relationship_goals, u.interests, 
+                    u.height, u.drinking, u.smoking, u.exercise_frequency, u.diet, 
+                    u.pets, u.star_sign,
+                    CASE WHEN ab.expires_at > ? THEN 1 ELSE 0 END as is_boosted
+                FROM Users u
+                LEFT JOIN ActiveBoosts ab ON u.id = ab.user_id
+                WHERE u.s2_cell_id IN (${cellsToQuery.map(() => '?').join(',')})
+                AND u.mode = ?
+                AND u.id != ?
+                AND u.age BETWEEN ? AND ?
+                ${genderFilter}
+                AND u.id NOT IN (SELECT target_id FROM Swipes WHERE actor_id = ?)
+                ORDER BY is_boosted DESC, u.trust_score DESC, RANDOM()
+                LIMIT 100
+            `;
+
+            const params = [
+                Date.now(), // for boost check
+                ...cellsToQuery,
+                currentUser.mode,
+                userId,
+                ageMin,
+                ageMax,
+                userId // for swipe exclusion
+            ];
+
+            const { results } = await env.DB.prepare(query).bind(...params).all();
 
             feedRaw = results;
 

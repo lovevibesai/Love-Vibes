@@ -145,6 +145,10 @@ function verifySecrets(env: Env): { valid: boolean; missing: string[] } {
     if (!env.DB) missing.push('DB (D1 Database)');
     if (!env.MEDIA_BUCKET) missing.push('MEDIA_BUCKET (R2)');
     if (!env.CHAT_ROOM) missing.push('CHAT_ROOM (Durable Object)');
+    
+    // Optional but recommended for full functionality
+    if (!env.CLOUDFLARE_API_TOKEN) missing.push('CLOUDFLARE_API_TOKEN (Turnstile/Stream)');
+    if (!env.RESEND_API_KEY) missing.push('RESEND_API_KEY (Email)');
 
     return { valid: missing.length === 0, missing };
 }

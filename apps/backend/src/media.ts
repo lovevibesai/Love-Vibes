@@ -82,6 +82,24 @@ export async function handleMedia(request: Request, env: Env): Promise<Response>
 
         if (!file) throw new AppError("No file provided", 400);
 
+        // Security: Validate Magic Bytes
+        const buffer = await file.arrayBuffer();
+        const bytes = new Uint8Array(buffer).slice(0, 4);
+        const header = Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('').toUpperCase();
+        
+        let valid = false;
+        // JPEG (FF D8 FF)
+        if (header.startsWith('FFD8FF')) valid = true;
+        // PNG (89 50 4E 47)
+        if (header === '89504E47') valid = true;
+        // WebP (RIFF....WEBP) - check 'WEBP' at offset 8, simplistic check here:
+        // GIF (47 49 46 38)
+        if (header.startsWith('47494638')) valid = true;
+        
+        if (!valid && type !== 'video') {
+             throw new AppError("Invalid file format. Only JPEG, PNG, and GIF are allowed.", 400);
+        }
+
         const fileId = crypto.randomUUID();
         const rawExt = file.name.split('.').pop() || 'jpg';
         const extension = rawExt.replace(/[^a-z0-9]/gi, '').toLowerCase();
@@ -98,7 +116,7 @@ export async function handleMedia(request: Request, env: Env): Promise<Response>
         // 3. Real AI Moderation (Classification check)
         try {
             const aiResult = await env.AI.run('@cf/microsoft/resnet-50', {
-                image: Array.from(new Uint8Array(await file.arrayBuffer()))
+                image: Array.from(new Uint8Array(buffer))
             }) as Array<{ label: string, score: number }>;
             // ResNet-50 returns labels like 'person', 'clothing', etc.
             // We can log this for human moderation or automatically flag suspicious uploads.

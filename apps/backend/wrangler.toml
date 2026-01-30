@@ -1,6 +1,7 @@
 name = "lovevibes"
 main = "src/index.ts"
 compatibility_date = "2025-01-18"
+account_id = "f1c046265d89af2aed1428fd9f623ec9"
 compatibility_flags = [ "nodejs_compat" ]
 [vars]
 RP_ID = "love-vibes-app.pages.dev"

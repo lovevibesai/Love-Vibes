@@ -59,8 +59,8 @@ export async function checkRateLimit(
         return { allowed: true, remaining, resetAt }
     } catch (error) {
         console.error('Rate limit check failed:', error)
-        // Fail open - allow the request
-        return { allowed: true, remaining: config.maxRequests, resetAt: now + config.windowSeconds }
+        // Fail closed - deny request on system error to prevent abuse
+        return { allowed: false, remaining: 0, resetAt: now + config.windowSeconds }
     }
 }
 

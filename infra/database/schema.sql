@@ -381,7 +381,20 @@ CREATE TABLE ActiveBoosts (
 
 CREATE INDEX idx_active_boosts_user ON ActiveBoosts(user_id, expires_at);
 
--- 25. Processed Webhooks (Stripe Idempotency)
+-- 25. Boost History (Analytics)
+CREATE TABLE BoostHistory (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    started_at INTEGER NOT NULL,
+    ended_at INTEGER NOT NULL,
+    views_gained INTEGER DEFAULT 0,
+    matches_gained INTEGER DEFAULT 0,
+    FOREIGN KEY(user_id) REFERENCES Users(id)
+);
+
+CREATE INDEX idx_boost_history_user ON BoostHistory(user_id);
+
+-- 26. Processed Webhooks (Stripe Idempotency)
 CREATE TABLE ProcessedWebhooks (
     event_id TEXT PRIMARY KEY,
     event_type TEXT NOT NULL,

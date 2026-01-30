@@ -152,6 +152,19 @@ export const api = {
             localStorage.removeItem('user_data');
             localStorage.removeItem('is_onboarded');
             localStorage.removeItem('current_screen');
+        },
+
+        requestPasswordReset: async (email: string) => {
+            return apiRequest('/v2/recovery/request', {
+                method: 'POST',
+                body: JSON.stringify({ email })
+            });
+        },
+        resetPassword: async (token: string, new_password: string) => {
+            return apiRequest('/v2/recovery/reset', {
+                method: 'POST',
+                body: JSON.stringify({ token, new_password })
+            });
         }
     },
 
@@ -227,6 +240,14 @@ export const api = {
             return apiRequest('/v2/referrals/unlock', {
                 method: 'POST',
                 body: JSON.stringify({ userId, scenarioType })
+            });
+        }
+    },
+    notifications: {
+        subscribe: async (subscription: any) => {
+            return apiRequest('/v2/notifications/subscribe', {
+                method: 'POST',
+                body: JSON.stringify({ subscription })
             });
         }
     },

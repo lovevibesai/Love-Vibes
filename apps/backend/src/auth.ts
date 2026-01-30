@@ -58,10 +58,12 @@ const OTP_ATTEMPTS_PREFIX = 'otp_attempts:';
 const MAX_OTP_ATTEMPTS = 5;
 const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
 
-// Helper to get JWT Secret (fallback to dev secret if missing)
+// Helper to get JWT Secret (Production Safe)
 function getJwtSecret(env: Env): Uint8Array {
-    const secret = env.JWT_SECRET || 'YOUR-256-BIT-SECRET-HERE';
-    return new TextEncoder().encode(secret);
+    if (!env.JWT_SECRET) {
+        throw new Error('Critical Security Error: JWT_SECRET is not set');
+    }
+    return new TextEncoder().encode(env.JWT_SECRET);
 }
 
 // Helper for RP_ID
@@ -224,8 +226,11 @@ export async function handleAuth(request: Request, env: Env): Promise<Response> 
     // 1. Turnstile Verification (Universal for Signups/Logins)
     const turnstileToken = request.headers.get('CF-Turnstile-Response');
     if (request.method === 'POST' && !turnstileToken && !path.includes('/dev/')) {
-        // In local dev we might skip, but production requires it
-        // await verifyTurnstile(turnstileToken, env);
+        // Enforce Turnstile in production
+        const isValid = await _verifyTurnstile(turnstileToken || "", env);
+        if (!isValid) {
+            return new Response(JSON.stringify({ success: false, error: 'Bot check failed' }), { status: 403 });
+        }
     }
 
     // --- PASSKEY (WEBAUTHN) FLOW ---
