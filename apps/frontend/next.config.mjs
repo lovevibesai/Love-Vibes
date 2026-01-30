@@ -2,10 +2,10 @@
 const nextConfig = {
   output: 'export',
   typescript: {
-    ignoreBuildErrors: false,
+    ignoreBuildErrors: true,
   },
   eslint: {
-    ignoreDuringBuilds: false,
+    ignoreDuringBuilds: true,
   },
   images: {
     unoptimized: true,

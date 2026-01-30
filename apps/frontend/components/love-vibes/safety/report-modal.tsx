@@ -88,7 +88,7 @@ export function ReportModal({ reportedUserId, reportedUserName, isOpen, onClose 
                 <DialogHeader>
                     <DialogTitle>Report {reportedUserName}</DialogTitle>
                     <DialogDescription>
-                        Help us understand what's happening.
+                        Help us understand what&apos;s happening.
                     </DialogDescription>
                 </DialogHeader>
                 <div className="grid gap-4 py-4">

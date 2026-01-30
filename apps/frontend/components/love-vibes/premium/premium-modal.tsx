@@ -159,7 +159,7 @@ export function PremiumModal({ isOpen, onClose }: PremiumModalProps) {
                             </Button>
 
                             <p className="text-[10px] text-zinc-600 text-center leading-relaxed">
-                                By tapping "GET", your payment will be charged to your account. Your subscription will automatically renew for the same price and duration until you cancel in settings.
+                                By tapping &quot;GET&quot;, your payment will be charged to your account. Your subscription will automatically renew for the same price and duration until you cancel in settings.
                             </p>
                         </div>
                     </div>

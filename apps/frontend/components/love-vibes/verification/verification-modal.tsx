@@ -33,7 +33,7 @@ export function VerificationModal({ isOpen, onClose, onSuccess }: VerificationMo
         return () => {
             stopCamera()
         }
-    }, [step])
+    }, [step, stopCamera])
 
     const startCamera = async () => {
         try {

@@ -111,7 +111,7 @@ export function ProximityAlert({ match, distance, venue, onAccept, onDecline }: 
                             onClick={onAccept}
                             className="flex-1 h-12 gradient-love text-white font-semibold"
                         >
-                            Let's Meet!
+                            Let&apos;s Meet!
                         </Button>
                     </div>
                 </div>

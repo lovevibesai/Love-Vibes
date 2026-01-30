@@ -106,7 +106,7 @@ export function ChemistryTest({ isActive, onComplete, onCancel }: ChemistryTestP
                         <Activity className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
                         <div className="text-sm text-muted-foreground">
                             <p className="font-medium text-foreground mb-1">How it works:</p>
-                            <p>We're using your camera to detect your heart rate. Keep your finger steady over the camera lens for accurate results.</p>
+                            <p>We&apos;re using your camera to detect your heart rate. Keep your finger steady over the camera lens for accurate results.</p>
                         </div>
                     </div>
                 </div>

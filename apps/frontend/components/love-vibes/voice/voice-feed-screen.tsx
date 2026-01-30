@@ -113,7 +113,7 @@ export function VoiceFeedScreen() {
                         </div>
                         <h2 className="text-2xl font-bold text-foreground mb-3">Depth First</h2>
                         <p className="text-muted-foreground mb-6 leading-relaxed">
-                            Match based on voice before seeing photos. Create deeper connections by hearing someone's personality, tone, and authenticity first.
+                            Match based on voice before seeing photos. Create deeper connections by hearing someone&apos;s personality, tone, and authenticity first.
                         </p>
                         <div className="space-y-3 mb-8">
                             <div className="flex items-start gap-3 text-left">
@@ -161,7 +161,7 @@ export function VoiceFeedScreen() {
                 </header>
                 <div className="flex-1 overflow-y-auto p-6">
                     <p className="text-center text-muted-foreground mb-6">
-                        Answer: "What are you looking for in a relationship?"
+                        Answer: &quot;What are you looking for in a relationship?&quot;
                     </p>
                     <VoiceRecorder onRecordingComplete={handleRecordingComplete} maxDuration={30} />
                 </div>

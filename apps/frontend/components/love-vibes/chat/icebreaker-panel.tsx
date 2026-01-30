@@ -31,7 +31,7 @@ export function IcebreakerPanel({ withUserId, onSelect, onClose }: IcebreakerPan
 
     useEffect(() => {
         fetchIcebreakers()
-    }, [withUserId])
+    }, [withUserId, fetchIcebreakers])
 
     return (
         <motion.div

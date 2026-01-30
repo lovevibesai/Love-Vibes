@@ -122,7 +122,7 @@ export function SuccessStoriesScreen() {
                                     </div>
                                 </div>
                                 <p className="text-foreground leading-relaxed italic">
-                                    "{story.story_text}"
+                                    &quot;{story.story_text}&quot;
                                 </p>
                             </div>
                         </div>

@@ -206,7 +206,7 @@ export function ExpandedProfile({ profile, onClose, onLike, onPass, onSuperLike 
                 <span className="text-sm font-bold text-rose-500 uppercase tracking-wider">AI Smart Match</span>
               </div>
               <p className="text-sm text-foreground/80 italic font-medium">
-                "{profile.matchReason || `You both have highly compatible relationship goals and shared interests in ${profile.interests?.[0] || 'lifestyle'}!`}"
+                &quot;{profile.matchReason || `You both have highly compatible relationship goals and shared interests in ${profile.interests?.[0] || 'lifestyle'}!`}&quot;
               </p>
             </div>
           )}
@@ -241,7 +241,7 @@ export function ExpandedProfile({ profile, onClose, onLike, onPass, onSuperLike 
           {/* Physical Info */}
           {profile.height && (
             <InfoSection icon={<Ruler className="w-5 h-5" />} title="Height">
-              <span>{Math.floor(profile.height / 30.48)}'{Math.round((profile.height % 30.48) / 2.54)}"</span>
+              <span>{Math.floor(profile.height / 30.48)}&apos;{Math.round((profile.height % 30.48) / 2.54)}&quot;</span>
             </InfoSection>
           )}
 

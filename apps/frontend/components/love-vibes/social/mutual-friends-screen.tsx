@@ -69,11 +69,11 @@ export function MutualFriendsScreen() {
                                 <ol className="space-y-3 text-sm text-muted-foreground">
                                     <li className="flex gap-2">
                                         <span className="font-bold text-primary">1.</span>
-                                        <span>Import your contacts (they're hashed for privacy)</span>
+                                        <span>Import your contacts (they&apos;re hashed for privacy)</span>
                                     </li>
                                     <li className="flex gap-2">
                                         <span className="font-bold text-primary">2.</span>
-                                        <span>See "1 mutual friend" badges on profiles</span>
+                                        <span>See &quot;1 mutual friend&quot; badges on profiles</span>
                                     </li>
                                     <li className="flex gap-2">
                                         <span className="font-bold text-primary">3.</span>
@@ -137,11 +137,11 @@ export function MutualFriendsScreen() {
                             </div>
 
                             <div className="p-4 bg-card rounded-xl border border-border">
-                                <h3 className="font-semibold text-foreground mb-3">What's next?</h3>
+                                <h3 className="font-semibold text-foreground mb-3">What&apos;s next?</h3>
                                 <ul className="space-y-2 text-sm text-muted-foreground">
                                     <li className="flex items-start gap-2">
                                         <span className="text-primary">•</span>
-                                        <span>Look for "1 mutual friend" badges on profiles</span>
+                                        <span>Look for &quot;1 mutual friend&quot; badges on profiles</span>
                                     </li>
                                     <li className="flex items-start gap-2">
                                         <span className="text-primary">•</span>
@@ -160,7 +160,7 @@ export function MutualFriendsScreen() {
 
                             <div className="p-4 bg-amber-500/10 rounded-xl border border-amber-500/20">
                                 <p className="text-sm text-amber-700 dark:text-amber-400">
-                                    <strong>Note:</strong> You'll also receive introduction requests when your friends want to connect with someone you know. You have full control to approve or decline.
+                                    <strong>Note:</strong> You&apos;ll also receive introduction requests when your friends want to connect with someone you know. You have full control to approve or decline.
                                 </p>
                             </div>
                         </div>

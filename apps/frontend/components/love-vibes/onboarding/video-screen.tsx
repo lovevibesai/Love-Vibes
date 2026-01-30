@@ -49,7 +49,7 @@ export function VideoScreen() {
       handleStopRecording()
     }
     return () => clearInterval(timer)
-  }, [isRecording, recordingTime])
+  }, [isRecording, recordingTime, handleStopRecording])
 
   const handleStartRecording = async () => {
     try {

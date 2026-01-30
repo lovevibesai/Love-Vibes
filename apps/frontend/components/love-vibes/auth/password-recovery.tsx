@@ -47,7 +47,7 @@ export function ForgotPasswordScreen({ onBack }: { onBack: () => void }) {
                                 </div>
                                 <h2 className="text-2xl font-bold text-foreground mb-2">Forgot Password?</h2>
                                 <p className="text-muted-foreground">
-                                    Enter your email and we'll send you a reset link
+                                    Enter your email and we&apos;ll send you a reset link
                                 </p>
                             </div>
 
@@ -83,14 +83,14 @@ export function ForgotPasswordScreen({ onBack }: { onBack: () => void }) {
                                 </div>
                                 <h2 className="text-2xl font-bold text-foreground mb-2">Check Your Email</h2>
                                 <p className="text-muted-foreground">
-                                    We've sent a password reset link to <strong>{email}</strong>
+                                    We&apos;ve sent a password reset link to <strong>{email}</strong>
                                 </p>
                             </div>
 
                             <div className="p-4 bg-card rounded-xl border border-border mb-6">
                                 <p className="text-sm text-muted-foreground leading-relaxed">
                                     Click the link in the email to reset your password. The link expires in 1 hour.
-                                    If you don't see the email, check your spam folder.
+                                    If you don&apos;t see the email, check your spam folder.
                                 </p>
                             </div>
 

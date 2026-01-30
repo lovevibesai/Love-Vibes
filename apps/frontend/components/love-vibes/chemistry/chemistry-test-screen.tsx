@@ -91,7 +91,7 @@ export function ChemistryTestScreen() {
                                 <ol className="space-y-2 text-sm text-muted-foreground">
                                     <li className="flex gap-2">
                                         <span className="font-bold text-primary">1.</span>
-                                        <span>Place your fingertip over your phone's camera</span>
+                                        <span>Place your fingertip over your phone&apos;s camera</span>
                                     </li>
                                     <li className="flex gap-2">
                                         <span className="font-bold text-primary">2.</span>

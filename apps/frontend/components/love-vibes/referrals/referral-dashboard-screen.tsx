@@ -48,7 +48,7 @@ export function ReferralDashboardScreen() {
 
     useEffect(() => {
         loadStats()
-    }, [])
+    }, [loadStats])
 
     const loadStats = async () => {
         if (!user?.id) return

@@ -285,7 +285,7 @@ export function ProfileScreen() {
           className="w-full bg-card/60 backdrop-blur-xl border border-border/50 rounded-[32px] p-6 shadow-sm flex items-center gap-5 hover:bg-card transition-colors group"
         >
           <div className="w-20 h-20 rounded-2xl bg-muted/50 overflow-hidden relative flex items-center justify-center">
-            {user.photoUrl && <img src={user.photoUrl} className="absolute inset-0 w-full h-full object-cover opacity-30 grayscale" />}
+            {user.photoUrl && <img src={user.photoUrl} alt="Profile" className="absolute inset-0 w-full h-full object-cover opacity-30 grayscale" />}
             <Video className="w-8 h-8 text-primary relative z-10" />
             <div className="absolute inset-0 bg-primary/10 animate-pulse" />
           </div>

@@ -265,7 +265,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           }
         });
     }
-  }, []); // Run only once on mount
+  }, [handleAuthenticatedUser]); // Run when handleAuthenticatedUser is stable
 
   // Persist Screen
   useEffect(() => {

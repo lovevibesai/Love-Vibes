@@ -126,7 +126,7 @@ export function HelpCenterScreen() {
 
                             {filteredFaqs.length === 0 && (
                                 <div className="text-center py-10">
-                                    <p className="text-sm text-muted-foreground">No matches found for "{searchQuery}"</p>
+                                    <p className="text-sm text-muted-foreground">No matches found for &quot;{searchQuery}&quot;</p>
                                 </div>
                             )}
                         </div>

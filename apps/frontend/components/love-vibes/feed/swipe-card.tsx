@@ -129,7 +129,7 @@ export function SwipeCard({ user, onSwipe, isTop, onTap }: SwipeCardProps) {
                 AI Insight
               </span>
               <span className="text-xs font-bold text-white/90 italic">
-                "{user.matchReason}"
+                &quot;{user.matchReason}&quot;
               </span>
             </div>
           )}
