@@ -148,7 +148,7 @@ function verifySecrets(env: Env): { valid: boolean; missing: string[] } {
     
     // Optional but recommended for full functionality
     if (!env.CLOUDFLARE_API_TOKEN) missing.push('CLOUDFLARE_API_TOKEN (Turnstile/Stream)');
-    if (!env.RESEND_API_KEY) missing.push('RESEND_API_KEY (Email)');
+    // if (!env.RESEND_API_KEY) missing.push('RESEND_API_KEY (Email)'); // Made optional to prevent startup crash if Stripe key is used
 
     return { valid: missing.length === 0, missing };
 }
