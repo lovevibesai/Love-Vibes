@@ -31,7 +31,7 @@ export async function handleBilling(request: Request, env: Env): Promise<Respons
         // 1. Purchase Credits (POST /v2/billing/purchase-credits)
         if (path.endsWith('/purchase-credits') && request.method === 'POST') {
             const body = PurchaseCreditsSchema.parse(await request.json());
-            const { package_id } = body;
+            const { package_id, payment_token: _payment_token } = body;
 
             const packages: Record<string, number> = {
                 'starter': 50,

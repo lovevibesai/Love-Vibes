@@ -139,7 +139,6 @@ export async function handleFeed(request: Request, env: Env): Promise<Response> 
             const ageMax = prefResult?.age_max || 99;
             // Gender filtering logic (0: Men, 1: Women, 2: Everyone)
             let genderFilter = "";
-            let genderParams: any[] = [];
             
             if (prefResult?.show_me === 'men') {
                 genderFilter = "AND gender = 0";

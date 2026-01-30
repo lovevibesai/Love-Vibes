@@ -4,6 +4,9 @@ import js from "@eslint/js";
 import globals from "globals";
 
 export default [
+    {
+        ignores: ["**/node_modules/**", "dist/**", ".wrangler/**", "worker-configuration.d.ts", "**/*.js", "**/*.mjs"]
+    },
     js.configs.recommended,
     {
         files: ["src/**/*.ts"],
@@ -12,8 +15,8 @@ export default [
             sourceType: "module",
             ecmaVersion: 2022,
             globals: {
-                ...globals.browser,
-                ...globals.node,
+                ...globals.browser, // Adds fetch, Response, Request, URL, crypto, TextEncoder
+                ...globals.node,    // Adds Buffer, process, console
                 ...globals.serviceworker
             }
         },
