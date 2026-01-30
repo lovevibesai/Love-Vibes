@@ -1,0 +1,4 @@
+rootProject.name = 'Love-Vibes'
+
+// Include the Android app as a composite build
+includeBuild('apps/frontend/android')

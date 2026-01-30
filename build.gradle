@@ -1,0 +1,10 @@
+// Root build.gradle
+// This file allows the root directory to be recognized as a Gradle build,
+// delegating actual work to the included builds in settings.gradle.
+
+tasks.register('clean') {
+    // No-op for root
+    doLast {
+        println "Root clean task"
+    }
+}
